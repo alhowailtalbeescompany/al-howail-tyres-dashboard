@@ -6010,8 +6010,8 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
                                             الفرع
                                         </th>
 
-                                        <th data-i18n="targets.monthlyTarget">
-                                            الهدف الشهري
+                                        <th data-i18n="targets.periodTarget">
+                                            هدف الفترة
                                         </th>
 
                                         <th data-i18n="targets.sales">
@@ -7297,6 +7297,7 @@ const TRANSLATIONS = {
             salesmanName: "اسم المندوب",
             branch: "الفرع",
             monthlyTarget: "الهدف الشهري",
+            periodTarget: "هدف الفترة",
             quarterTarget: "الهدف الربع سنوي",
             sales: "المبيعات",
             achievement: "نسبة التحقيق",
@@ -7659,6 +7660,7 @@ const TRANSLATIONS = {
             salesmanName: "Salesman Name",
             branch: "Branch",
             monthlyTarget: "Monthly Target",
+            periodTarget: "Period Target",
             quarterTarget: "Quarter Target",
             sales: "Sales",
             achievement: "Achievement",
@@ -16772,6 +16774,117 @@ window.DashboardTargets = (() => {
     }
 
     /* =====================================================
+       الفترة المختارة من الفلاتر
+       الهدف = مجموع الأهداف الشهرية لكل شهر داخل الفترة
+    ===================================================== */
+
+    let periodRange = null;
+
+    function toIsoDateText(value) {
+        if (!value) {
+            return "";
+        }
+
+        if (value instanceof Date) {
+            if (Number.isNaN(value.getTime())) {
+                return "";
+            }
+
+            return (
+                value.getFullYear() +
+                "-" +
+                String(value.getMonth() + 1).padStart(2, "0") +
+                "-" +
+                String(value.getDate()).padStart(2, "0")
+            );
+        }
+
+        const text = String(value).trim();
+
+        if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+            return text.slice(0, 10);
+        }
+
+        return toIsoDateText(new Date(text));
+    }
+
+    function setPeriod(dateFrom, dateTo) {
+        let from = toIsoDateText(dateFrom);
+        let to = toIsoDateText(dateTo);
+
+        if (!from && !to) {
+            periodRange = null;
+            render();
+            return null;
+        }
+
+        from = from || to;
+        to = to || from;
+
+        if (from > to) {
+            [from, to] = [to, from];
+        }
+
+        const months = [];
+        let year = Number(from.slice(0, 4));
+        let month = Number(from.slice(5, 7));
+        const endYear = Number(to.slice(0, 4));
+        const endMonth = Number(to.slice(5, 7));
+
+        while (
+            (year < endYear || (year === endYear && month <= endMonth)) &&
+            months.length < 120
+        ) {
+            months.push({ year, month });
+            month += 1;
+
+            if (month > 12) {
+                month = 1;
+                year += 1;
+            }
+        }
+
+        periodRange = { from, to, months };
+        render();
+
+        return { ...periodRange };
+    }
+
+    function getPeriod() {
+        return periodRange ? { ...periodRange } : null;
+    }
+
+    function isInPeriod(value) {
+        if (!periodRange) {
+            return isSameMonth(value, referenceDate);
+        }
+
+        const date = toIsoDateText(value);
+
+        if (!date) {
+            return true;
+        }
+
+        return date >= periodRange.from && date <= periodRange.to;
+    }
+
+    function getPeriodTarget(row, quarter) {
+        if (!periodRange) {
+            return getMonthlyTarget(row, quarter);
+        }
+
+        return periodRange.months.reduce(
+            (total, item) =>
+                total +
+                getMonthlyTarget(
+                    row,
+                    Math.floor((item.month - 1) / 3) + 1
+                ),
+            0
+        );
+    }
+
+    /* =====================================================
        توحيد بيانات Target
     ===================================================== */
 
@@ -17146,9 +17259,8 @@ window.DashboardTargets = (() => {
             }
 
             if (
-                !isSameMonth(
-                    invoice.invoiceDate,
-                    referenceDate
+                !isInPeriod(
+                    invoice.invoiceDate
                 )
             ) {
                 return;
@@ -17182,8 +17294,12 @@ window.DashboardTargets = (() => {
 
         return targetRows
             .map(row => {
+                /*
+                 * monthlyTarget هنا = هدف الفترة المختارة
+                 * (مجموع الأهداف الشهرية لشهور الفترة).
+                 */
                 const monthlyTarget =
-                    getMonthlyTarget(
+                    getPeriodTarget(
                         row,
                         quarter
                     );
@@ -17656,8 +17772,8 @@ window.DashboardTargets = (() => {
                     row.quarterName,
 
                 [translate(
-                    "targets.monthlyTarget",
-                    "الهدف الشهري"
+                    "targets.periodTarget",
+                    "هدف الفترة"
                 )]:
                     row.monthlyTarget,
 
@@ -17864,6 +17980,8 @@ window.DashboardTargets = (() => {
         clearSearch,
 
         setReferenceDate,
+        setPeriod,
+        getPeriod,
         getReferenceDate,
         getQuarter,
         getQuarterName,
@@ -30830,6 +30948,13 @@ window.DashboardApp = (() => {
          * Previously it always used the browser's current month, so
          * choosing a past month (e.g. July) returned zero sales.
          */
+        callModule(
+            window.DashboardTargets,
+            "setPeriod",
+            data.filters?.dateFrom || "",
+            data.filters?.dateTo || ""
+        );
+
         callModule(
             window.DashboardTargets,
             "setReferenceDate",
