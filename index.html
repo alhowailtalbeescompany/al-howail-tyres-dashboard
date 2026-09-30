@@ -4204,6 +4204,175 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
         justify-content: center;
     }
 }
+
+/* ===== Customer notes ===== */
+.customer-note-cell {
+    min-width: 150px;
+    max-width: 240px;
+}
+
+.customer-note-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.customer-note-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: pre-line;
+    font-size: 12px;
+    color: var(--text-primary);
+    background: var(--warning-light);
+    border-radius: 8px;
+    padding: 6px 8px;
+    text-align: start;
+    width: 100%;
+}
+
+.customer-note-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px dashed var(--border-strong);
+    background: transparent;
+    color: var(--primary);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.customer-note-button:hover {
+    background: var(--primary-light);
+}
+
+.customer-note-button:focus-visible,
+.customer-note-actions button:focus-visible,
+.customer-note-close:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.customer-note-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.customer-note-modal[hidden] {
+    display: none;
+}
+
+.customer-note-dialog {
+    width: 100%;
+    max-width: 520px;
+    background: var(--surface);
+    color: var(--text-primary);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.customer-note-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.customer-note-dialog-header h3 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.customer-note-close {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.customer-note-customer {
+    margin: 6px 0 12px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+#customerNoteModalText {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    background: var(--surface-soft);
+    color: var(--text-primary);
+}
+
+#customerNoteModalText:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+}
+
+.customer-note-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.customer-note-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.customer-note-actions button {
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.customer-note-actions .customer-note-save {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 700;
+}
+
+.customer-note-actions .customer-note-save:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.customer-note-actions .customer-note-delete {
+    color: var(--danger);
+    border-color: var(--danger-light);
+}
+
+.customer-note-actions .customer-note-delete[hidden] {
+    display: none;
+}
 </style>
 </head>
 
@@ -5988,6 +6157,18 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
                                     </span>
                                 </button>
 
+                                <button
+                                    class="secondary-button"
+                                    id="exportTargetsPdfButton"
+                                    type="button"
+                                >
+                                    <i class="fa-solid fa-file-pdf"></i>
+
+                                    <span data-i18n="common.exportPdf">
+                                        تصدير PDF
+                                    </span>
+                                </button>
+
                             </div>
 
                         </div>
@@ -6482,6 +6663,10 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
 
                                             <th data-i18n="salesmanProfiles.customerStatus">
                                                 حالة العميل
+                                            </th>
+
+                                            <th data-i18n="salesmanProfiles.notes">
+                                                ملاحظات
                                             </th>
                                         </tr>
                                     </thead>
@@ -7094,6 +7279,7 @@ const TRANSLATIONS = {
             reset: "إعادة ضبط",
             refresh: "تحديث",
             exportExcel: "تصدير Excel",
+            exportPdf: "تصدير PDF",
             print: "طباعة",
             view: "عرض",
             details: "التفاصيل",
@@ -7347,6 +7533,9 @@ const TRANSLATIONS = {
             nextInvoice: "الفاتورة القادمة",
             nextDueDate: "موعد التحصيل",
             customerStatus: "حالة العميل",
+            notes: "ملاحظات",
+            addNote: "إضافة",
+            editNote: "تعديل",
             active: "نشط",
             dueActive: "مستحق ونشط",
             inactive: "غير نشط",
@@ -7457,6 +7646,7 @@ const TRANSLATIONS = {
             reset: "Reset",
             refresh: "Refresh",
             exportExcel: "Export Excel",
+            exportPdf: "Export PDF",
             print: "Print",
             view: "View",
             details: "Details",
@@ -7710,6 +7900,9 @@ const TRANSLATIONS = {
             nextInvoice: "Next Invoice",
             nextDueDate: "Next Due Date",
             customerStatus: "Customer Status",
+            notes: "Notes",
+            addNote: "Add",
+            editNote: "Edit",
             active: "Active",
             dueActive: "Due & Active",
             inactive: "Inactive",
@@ -9110,8 +9303,116 @@ window.DashboardAPI = (() => {
             upcomingDue:
                 Array.isArray(response?.upcomingDue)
                     ? response.upcomingDue
-                    : []
+                    : [],
+
+            customerNotes: (() => {
+                const notes = Array.isArray(
+                    response?.customerNotes
+                )
+                    ? response.customerNotes
+                    : [];
+
+                window.DashboardNotes?.setAll(notes);
+
+                return notes;
+            })()
         };
+    }
+
+    /* =====================================================
+       طلب POST (للنصوص الطويلة مثل الملاحظات)
+       Content-Type = text/plain لتفادي CORS preflight
+    ===================================================== */
+
+    async function postRequest(parameters = {}) {
+        const controller = new AbortController();
+
+        const timeoutId = window.setTimeout(
+            () => controller.abort(),
+            DEFAULT_TIMEOUT
+        );
+
+        try {
+            const response = await fetch(
+                config.API_URL,
+                {
+                    method: "POST",
+                    cache: "no-store",
+                    redirect: "follow",
+                    signal: controller.signal,
+                    headers: {
+                        "Content-Type":
+                            "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(parameters)
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Server request failed: HTTP ${response.status}`
+                );
+            }
+
+            const payload =
+                await parseResponse(response);
+
+            if (payload && payload.success === false) {
+                const apiError = new Error(
+                    getErrorMessage(
+                        payload,
+                        "The API request failed."
+                    )
+                );
+
+                apiError.code =
+                    payload.error || "API_ERROR";
+
+                throw apiError;
+            }
+
+            return payload;
+        } catch (error) {
+            if (error.name === "AbortError") {
+                throw new Error(
+                    "The server request timed out. Please try again."
+                );
+            }
+
+            throw error;
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
+
+    /* =====================================================
+       حفظ ملاحظة عميل
+    ===================================================== */
+
+    async function saveCustomerNote(
+        token,
+        {
+            customerCode = "",
+            salesmanCode = "",
+            note = ""
+        } = {}
+    ) {
+        const normalizedToken =
+            String(token ?? "").trim();
+
+        if (!normalizedToken) {
+            throw new Error(
+                "Session token is missing."
+            );
+        }
+
+        return postRequest({
+            action: "saveNote",
+            token: normalizedToken,
+            customerCode: String(customerCode),
+            salesmanCode: String(salesmanCode),
+            note: String(note ?? "")
+        });
     }
 
     /* =====================================================
@@ -9150,7 +9451,98 @@ window.DashboardAPI = (() => {
         logout,
         session,
         dashboard,
+        saveCustomerNote,
         testConnection
+    });
+})();
+
+/* =========================================================
+   مخزن ملاحظات العملاء
+   المفتاح = كود العميل + كود المندوب
+========================================================= */
+
+window.DashboardNotes = (() => {
+    const notes = new Map();
+    const listeners = new Set();
+
+    function key(customerCode, salesmanCode) {
+        return `${String(customerCode ?? "").trim()}|${String(salesmanCode ?? "").trim()}`;
+    }
+
+    function notify() {
+        listeners.forEach(listener => {
+            try {
+                listener();
+            } catch (error) {
+                console.error(error);
+            }
+        });
+    }
+
+    function setAll(rows = []) {
+        notes.clear();
+
+        (Array.isArray(rows) ? rows : []).forEach(row => {
+            if (row && row.customerCode && row.note) {
+                notes.set(
+                    key(row.customerCode, row.salesmanCode),
+                    row
+                );
+            }
+        });
+
+        notify();
+    }
+
+    function get(customerCode, salesmanCode) {
+        return notes.get(
+            key(customerCode, salesmanCode)
+        ) || null;
+    }
+
+    async function save(
+        customerCode,
+        salesmanCode,
+        noteText
+    ) {
+        const token =
+            window.DashboardAuth?.getToken?.() || "";
+
+        const response =
+            await window.DashboardAPI.saveCustomerNote(
+                token,
+                {
+                    customerCode,
+                    salesmanCode,
+                    note: noteText
+                }
+            );
+
+        const saved = response?.note || {};
+        const noteKey = key(customerCode, salesmanCode);
+
+        if (saved.note) {
+            notes.set(noteKey, saved);
+        } else {
+            notes.delete(noteKey);
+        }
+
+        notify();
+
+        return saved;
+    }
+
+    function onChange(listener) {
+        if (typeof listener === "function") {
+            listeners.add(listener);
+        }
+    }
+
+    return Object.freeze({
+        setAll,
+        get,
+        save,
+        onChange
     });
 })();
 </script>
@@ -17920,6 +18312,384 @@ window.DashboardTargets = (() => {
        ربط أحداث الصفحة
     ===================================================== */
 
+
+    /* =====================================================
+       تصدير PDF (طباعة / حفظ PDF)
+    ===================================================== */
+
+    function printHtmlDocument(documentHtml) {
+        document.getElementById("targetsPrintFrame")?.remove();
+
+        const frame = document.createElement("iframe");
+        frame.id = "targetsPrintFrame";
+        frame.setAttribute("aria-hidden", "true");
+        frame.style.cssText =
+            "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+
+        frame.addEventListener("load", () => {
+            const view = frame.contentWindow;
+
+            const run = () => {
+                try {
+                    view.focus();
+                    view.print();
+                } catch (error) {
+                    console.error(error);
+                }
+            };
+
+            const ready = frame.contentDocument?.fonts?.ready;
+
+            if (ready) {
+                ready.then(() => window.setTimeout(run, 150)).catch(run);
+            } else {
+                window.setTimeout(run, 150);
+            }
+        }, { once: true });
+
+        document.body.appendChild(frame);
+        frame.srcdoc = documentHtml;
+    }
+
+    function exportPdf() {
+        const rows = getFilteredRows();
+        const dashboardUtils = window.DashboardUtils;
+
+        if (!rows.length) {
+            dashboardUtils?.showToast?.(
+                translate("messages.noExportData", "لا توجد بيانات لتصديرها"),
+                "warning"
+            );
+            return false;
+        }
+
+        const isArabic = (dashboardUtils?.getLanguage?.() || "ar") !== "en";
+        const locale = isArabic ? "ar-SA-u-ca-gregory-nu-latn" : "en-GB";
+
+        const L = isArabic
+            ? {
+                  title: "تقرير الأهداف البيعية",
+                  subtitle: "هدف الفترة ونسبة تحقيق كل مندوب",
+                  period: "الفترة",
+                  scope: "النطاق",
+                  allBranches: "جميع الفروع",
+                  branch: "الفرع",
+                  search: "بحث",
+                  generated: "تاريخ الإصدار",
+                  totalTarget: "إجمالي هدف الفترة",
+                  totalSales: "إجمالي المبيعات",
+                  achievement: "نسبة التحقيق",
+                  remaining: "المتبقي",
+                  achievedCount: "حققوا الهدف",
+                  byBranch: "ملخص الفروع",
+                  bySalesman: "تفاصيل المندوبين",
+                  code: "الكود",
+                  salesman: "المندوب",
+                  target: "هدف الفترة",
+                  sales: "المبيعات",
+                  excess: "الزيادة",
+                  status: "الحالة",
+                  achieved: "تم التحقيق",
+                  below: "أقل من الهدف",
+                  noTarget: "بدون هدف",
+                  total: "الإجمالي",
+                  count: "المندوبين",
+                  note: "المبالغ بالريال السعودي، والمبيعات بدون ضريبة القيمة المضافة",
+                  fromTo: (from, to) => `من ${from} إلى ${to}`,
+                  ofCount: (done, all) => `${done} من ${all}`
+              }
+            : {
+                  title: "Sales Targets Report",
+                  subtitle: "Period target and achievement by salesman",
+                  period: "Period",
+                  scope: "Scope",
+                  allBranches: "All branches",
+                  branch: "Branch",
+                  search: "Search",
+                  generated: "Generated on",
+                  totalTarget: "Total period target",
+                  totalSales: "Total sales",
+                  achievement: "Achievement",
+                  remaining: "Remaining",
+                  achievedCount: "Achieved target",
+                  byBranch: "Branch summary",
+                  bySalesman: "Salesman details",
+                  code: "Code",
+                  salesman: "Salesman",
+                  target: "Period target",
+                  sales: "Sales",
+                  excess: "Excess",
+                  status: "Status",
+                  achieved: "Achieved",
+                  below: "Below target",
+                  noTarget: "No target",
+                  total: "Total",
+                  count: "Salesmen",
+                  note: "Amounts in SAR. Sales exclude VAT.",
+                  fromTo: (from, to) => `${from} to ${to}`,
+                  ofCount: (done, all) => `${done} of ${all}`
+              };
+
+        const integer = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+        const money = value => integer.format(Math.round(toNumber(value)));
+        const pct = value => `\u2066${toNumber(value).toFixed(1)}%\u2069`;
+        const esc = value => escapeHTML(value == null ? "" : String(value));
+
+        const formatDay = value => {
+            const date = value instanceof Date
+                ? value
+                : new Date(`${String(value).slice(0, 10)}T00:00:00`);
+
+            return Number.isNaN(date.getTime())
+                ? String(value || "")
+                : new Intl.DateTimeFormat(locale, {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric"
+                  }).format(date);
+        };
+
+        const period = getPeriod();
+        const periodLabel = period
+            ? L.fromTo(formatDay(period.from), formatDay(period.to))
+            : new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" })
+                  .format(getReferenceDate());
+
+        const branchFilter = String(byId("branchFilter")?.value || "").trim();
+        const scopeLabel = branchFilter || L.allBranches;
+        const searchValue = String(byId("targetsSearchInput")?.value || "").trim();
+
+        const tone = row => {
+            if (!(toNumber(row.monthlyTarget) > 0)) return "is-none";
+            if (row.achievement >= 100) return "is-good";
+            if (row.achievement >= 80) return "is-warn";
+            return "is-bad";
+        };
+
+        const meter = (achievement, className) => {
+            const fill = Math.max(0, Math.min(100, toNumber(achievement)));
+
+            return `
+                <div class="meter ${className}">
+                    <span class="track"><i style="width:${fill.toFixed(1)}%"></i></span>
+                    <b>${className === "is-none" ? "—" : pct(achievement)}</b>
+                </div>`;
+        };
+
+        const totalTarget = rows.reduce((sum, row) => sum + toNumber(row.monthlyTarget), 0);
+        const totalSales = rows.reduce((sum, row) => sum + toNumber(row.sales), 0);
+        const totalAchievement = totalTarget > 0 ? (totalSales / totalTarget) * 100 : 0;
+        const withTarget = rows.filter(row => toNumber(row.monthlyTarget) > 0);
+        const achievedRows = withTarget.filter(row => row.achieved);
+
+        const totalsTone = totalTarget > 0
+            ? (totalAchievement >= 100 ? "is-good" : totalAchievement >= 80 ? "is-warn" : "is-bad")
+            : "is-none";
+
+        const branches = new Map();
+
+        rows.forEach(row => {
+            const name = row.branch || "—";
+            const entry = branches.get(name) || { name, target: 0, sales: 0, count: 0, achieved: 0 };
+
+            entry.target += toNumber(row.monthlyTarget);
+            entry.sales += toNumber(row.sales);
+            entry.count += 1;
+
+            if (row.achieved) entry.achieved += 1;
+
+            branches.set(name, entry);
+        });
+
+        const branchRows = [...branches.values()]
+            .map(entry => ({
+                ...entry,
+                achievement: entry.target > 0 ? (entry.sales / entry.target) * 100 : 0,
+                monthlyTarget: entry.target
+            }))
+            .sort((a, b) => b.achievement - a.achievement || b.sales - a.sales);
+
+        const logo = document.querySelector(".sidebar-brand-logo img")?.getAttribute("src") || "";
+
+        const salesmanRowsHtml = rows.map((row, index) => {
+            const rowTone = tone(row);
+            const hasTarget = rowTone !== "is-none";
+
+            return `
+                <tr>
+                    <td class="n muted">${index + 1}</td>
+                    <td><bdi dir="ltr">${esc(row.salesmanCode)}</bdi></td>
+                    <td class="strong">${esc(row.salesmanName)}</td>
+                    <td>${esc(row.branch)}</td>
+                    <td class="n">${hasTarget ? money(row.monthlyTarget) : `<span class="muted">${esc(L.noTarget)}</span>`}</td>
+                    <td class="n">${money(row.sales)}</td>
+                    <td>${meter(row.achievement, rowTone)}</td>
+                    <td class="n">${hasTarget ? money(row.remaining) : "—"}</td>
+                    <td class="n">${hasTarget && row.excess > 0 ? money(row.excess) : "—"}</td>
+                    <td><span class="badge ${rowTone}">${esc(!hasTarget ? L.noTarget : row.achieved ? L.achieved : L.below)}</span></td>
+                </tr>`;
+        }).join("");
+
+        const branchRowsHtml = branchRows.map(entry => {
+            const entryTone = entry.target > 0
+                ? (entry.achievement >= 100 ? "is-good" : entry.achievement >= 80 ? "is-warn" : "is-bad")
+                : "is-none";
+
+            return `
+                <tr>
+                    <td class="strong">${esc(entry.name)}</td>
+                    <td class="n">${money(entry.target)}</td>
+                    <td class="n">${money(entry.sales)}</td>
+                    <td>${meter(entry.achievement, entryTone)}</td>
+                    <td class="n">${money(Math.max(entry.target - entry.sales, 0))}</td>
+                    <td class="n">${esc(L.ofCount(entry.achieved, entry.count))}</td>
+                </tr>`;
+        }).join("");
+
+        const fileDate = period ? `${period.from}_${period.to}` : new Date().toISOString().slice(0, 10);
+        const docTitle = `Sales-Targets_${branchFilter ? branchFilter.replace(/\s+/g, "-") + "_" : ""}${fileDate}`;
+
+        const documentHtml = `<!DOCTYPE html>
+<html lang="${isArabic ? "ar" : "en"}" dir="${isArabic ? "rtl" : "ltr"}">
+<head>
+<meta charset="UTF-8">
+<title>${esc(docTitle)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 landscape; margin: 11mm 10mm 12mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: ${isArabic ? '"Cairo", "Inter"' : '"Inter", "Cairo"'}, "Segoe UI", Tahoma, sans-serif;
+    color: #0c2e42;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+header { display: flex; align-items: center; gap: 16px; padding-bottom: 10px; border-bottom: 2px solid #0c2e42; }
+header img { height: 44px; width: auto; }
+header h1 { font-size: 22px; font-weight: 800; line-height: 1.2; }
+header p { color: #5b6b78; font-size: 12px; }
+.meta { margin-inline-start: auto; display: grid; grid-template-columns: auto auto; gap: 2px 12px; font-size: 11px; }
+.meta dt { color: #5b6b78; }
+.meta dd { font-weight: 700; }
+.kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 14px 0; }
+.kpi { border: 1px solid #dfe6ec; border-top: 4px solid #1c95b8; padding: 8px 12px; }
+.kpi span { display: block; color: #5b6b78; font-size: 11px; }
+.kpi strong { display: block; font-size: 19px; font-weight: 800; font-family: "Inter", "Cairo", sans-serif; }
+.kpi.is-good { border-top-color: #1f8a5b; } .kpi.is-good strong { color: #1f8a5b; }
+.kpi.is-warn { border-top-color: #c98a12; } .kpi.is-warn strong { color: #a8700a; }
+.kpi.is-bad { border-top-color: #c0392b; } .kpi.is-bad strong { color: #c0392b; }
+h2 { font-size: 14px; font-weight: 800; margin: 14px 0 6px; padding-inline-start: 9px; border-inline-start: 4px solid #1c95b8; }
+table { width: 100%; border-collapse: collapse; }
+thead { display: table-header-group; }
+tfoot { display: table-row-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th { background: #0c2e42; color: #fff; font-weight: 700; padding: 6px 8px; text-align: start; white-space: nowrap; }
+td { padding: 5px 8px; border-bottom: 1px solid #e6ecf1; white-space: nowrap; }
+tbody tr:nth-child(even) td { background: #f5f8fa; }
+tfoot td { font-weight: 800; background: #e8f1f5; border-top: 2px solid #0c2e42; }
+.n { text-align: end; }
+.strong { font-weight: 700; }
+.muted { color: #8595a2; }
+.meter { display: flex; align-items: center; gap: 6px; min-width: 120px; }
+.track { position: relative; flex: 1; height: 7px; background: #e3eaef; overflow: hidden; }
+.track i { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; background: #9aabb7; }
+.meter b { min-width: 46px; text-align: end; font-size: 11px; }
+.meter.is-good i { background: #1f8a5b; } .meter.is-good b { color: #1f8a5b; }
+.meter.is-warn i { background: #c98a12; } .meter.is-warn b { color: #a8700a; }
+.meter.is-bad i { background: #c0392b; } .meter.is-bad b { color: #c0392b; }
+.meter.is-none b { color: #8595a2; }
+.badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; background: #eef2f5; color: #5b6b78; }
+.badge.is-good { background: #e3f3eb; color: #1f8a5b; }
+.badge.is-warn { background: #fbf1dc; color: #a8700a; }
+.badge.is-bad { background: #fbe6e3; color: #c0392b; }
+footer { margin-top: 10px; display: flex; justify-content: space-between; color: #8595a2; font-size: 10px; border-top: 1px solid #dfe6ec; padding-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+    ${logo ? `<img src="${esc(logo)}" alt="">` : ""}
+    <div>
+        <h1>${esc(L.title)}</h1>
+        <p>${esc(L.subtitle)}</p>
+    </div>
+    <dl class="meta">
+        <dt>${esc(L.period)}</dt><dd>${esc(periodLabel)}</dd>
+        <dt>${esc(L.scope)}</dt><dd>${esc(scopeLabel)}</dd>
+        ${searchValue ? `<dt>${esc(L.search)}</dt><dd>${esc(searchValue)}</dd>` : ""}
+        <dt>${esc(L.generated)}</dt><dd>${esc(formatDay(new Date()))}</dd>
+    </dl>
+</header>
+
+<section class="kpis">
+    <div class="kpi"><span>${esc(L.totalTarget)}</span><strong>${money(totalTarget)}</strong></div>
+    <div class="kpi"><span>${esc(L.totalSales)}</span><strong>${money(totalSales)}</strong></div>
+    <div class="kpi ${totalsTone}"><span>${esc(L.achievement)}</span><strong>${totalTarget > 0 ? pct(totalAchievement) : "—"}</strong></div>
+    <div class="kpi"><span>${esc(L.remaining)}</span><strong>${money(Math.max(totalTarget - totalSales, 0))}</strong></div>
+    <div class="kpi"><span>${esc(L.achievedCount)}</span><strong>${esc(L.ofCount(achievedRows.length, withTarget.length))}</strong></div>
+</section>
+
+${branchRows.length > 1 ? `
+<h2>${esc(L.byBranch)}</h2>
+<table>
+    <thead>
+        <tr>
+            <th>${esc(L.branch)}</th>
+            <th class="n">${esc(L.target)}</th>
+            <th class="n">${esc(L.sales)}</th>
+            <th>${esc(L.achievement)}</th>
+            <th class="n">${esc(L.remaining)}</th>
+            <th class="n">${esc(L.achievedCount)}</th>
+        </tr>
+    </thead>
+    <tbody>${branchRowsHtml}</tbody>
+</table>` : ""}
+
+<h2>${esc(L.bySalesman)}</h2>
+<table>
+    <thead>
+        <tr>
+            <th class="n">#</th>
+            <th>${esc(L.code)}</th>
+            <th>${esc(L.salesman)}</th>
+            <th>${esc(L.branch)}</th>
+            <th class="n">${esc(L.target)}</th>
+            <th class="n">${esc(L.sales)}</th>
+            <th>${esc(L.achievement)}</th>
+            <th class="n">${esc(L.remaining)}</th>
+            <th class="n">${esc(L.excess)}</th>
+            <th>${esc(L.status)}</th>
+        </tr>
+    </thead>
+    <tbody>${salesmanRowsHtml}</tbody>
+    <tfoot>
+        <tr>
+            <td colspan="4">${esc(L.total)}</td>
+            <td class="n">${money(totalTarget)}</td>
+            <td class="n">${money(totalSales)}</td>
+            <td>${meter(totalAchievement, totalsTone)}</td>
+            <td class="n">${money(Math.max(totalTarget - totalSales, 0))}</td>
+            <td class="n">${money(Math.max(totalSales - totalTarget, 0))}</td>
+            <td></td>
+        </tr>
+    </tfoot>
+</table>
+
+<footer>
+    <span>Al-Howail Tyres</span>
+    <span>${esc(L.note)}</span>
+</footer>
+</body>
+</html>`;
+
+        printHtmlDocument(documentHtml);
+
+        return true;
+    }
+
     function bindEvents() {
         if (eventsBound) {
             return;
@@ -17945,6 +18715,11 @@ window.DashboardTargets = (() => {
             exportExcel
         );
 
+        byId("exportTargetsPdfButton")?.addEventListener(
+            "click",
+            exportPdf
+        );
+
         eventsBound = true;
     }
 
@@ -17964,6 +18739,7 @@ window.DashboardTargets = (() => {
     ===================================================== */
 
     return Object.freeze({
+        exportPdf,
         initialize,
         bindEvents,
 
@@ -19508,7 +20284,8 @@ window.DashboardProfiles = (() => {
                     customer.sales,
                     customer.collections,
                     customer.due,
-                    customer.overdue
+                    customer.overdue,
+                    getCustomerNote(customer)?.note || ""
                 ].some(value =>
                     utils
                         .normalizeText(value)
@@ -19748,7 +20525,250 @@ window.DashboardProfiles = (() => {
         };
     }
 
-    function createCustomerRow(customer) {
+
+    /* =====================================================
+       ملاحظات العملاء
+    ===================================================== */
+
+    let activeProfileCode = "";
+    let noteModalCustomerCode = "";
+    let noteModalSaving = false;
+
+    function getCustomerNote(customer) {
+        return (
+            window.DashboardNotes?.get(
+                customer.customerCode,
+                activeProfileCode
+            ) || null
+        );
+    }
+
+    function renderNoteCell(customer, forPrint) {
+        const note = getCustomerNote(customer);
+        const text = note?.note || "";
+
+        if (forPrint) {
+            return text
+                ? utils.escapeHTML(text).replace(/\n/g, "<br>")
+                : "";
+        }
+
+        const buttonLabel = text
+            ? utils.t("salesmanProfiles.editNote", "تعديل")
+            : utils.t("salesmanProfiles.addNote", "إضافة");
+
+        return `
+            <div class="customer-note-wrap">
+                ${
+                    text
+                        ? `<span class="customer-note-text" title="${utils.escapeHTML(text)}">${utils.escapeHTML(text)}</span>`
+                        : ""
+                }
+                <button
+                    type="button"
+                    class="customer-note-button"
+                    data-customer-code="${utils.escapeHTML(customer.customerCode || "")}"
+                    data-customer-name="${utils.escapeHTML(customer.customerName || "")}"
+                    title="${utils.escapeHTML(buttonLabel)}"
+                >
+                    <i class="fa-solid ${text ? "fa-pen" : "fa-plus"}"></i>
+                    <span>${utils.escapeHTML(buttonLabel)}</span>
+                </button>
+            </div>
+        `;
+    }
+
+    function ensureNoteModal() {
+        let modal = utils.byId("customerNoteModal");
+
+        if (modal) {
+            return modal;
+        }
+
+        modal = document.createElement("div");
+        modal.id = "customerNoteModal";
+        modal.className = "customer-note-modal";
+        modal.hidden = true;
+
+        modal.innerHTML = `
+            <div class="customer-note-dialog" role="dialog" aria-modal="true" aria-labelledby="customerNoteModalTitle">
+                <div class="customer-note-dialog-header">
+                    <h3 id="customerNoteModalTitle"></h3>
+                    <button type="button" class="customer-note-close" data-note-action="close" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <p id="customerNoteModalCustomer" class="customer-note-customer"></p>
+
+                <textarea
+                    id="customerNoteModalText"
+                    maxlength="1000"
+                    rows="5"
+                ></textarea>
+
+                <div class="customer-note-meta">
+                    <span id="customerNoteModalInfo"></span>
+                    <span id="customerNoteModalCounter">0 / 1000</span>
+                </div>
+
+                <div class="customer-note-actions">
+                    <button type="button" class="customer-note-delete" data-note-action="delete"></button>
+                    <span style="flex:1"></span>
+                    <button type="button" class="customer-note-cancel" data-note-action="close"></button>
+                    <button type="button" class="customer-note-save" data-note-action="save"></button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const textArea = utils.byId("customerNoteModalText");
+
+        textArea.addEventListener("input", () => {
+            utils.byId("customerNoteModalCounter").textContent =
+                `${textArea.value.length} / 1000`;
+        });
+
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                closeNoteModal();
+                return;
+            }
+
+            const action =
+                event.target.closest("[data-note-action]")
+                    ?.dataset.noteAction;
+
+            if (action === "close") {
+                closeNoteModal();
+            } else if (action === "save") {
+                submitNote(textArea.value);
+            } else if (action === "delete") {
+                submitNote("");
+            }
+        });
+
+        document.addEventListener("keydown", event => {
+            if (
+                event.key === "Escape" &&
+                !modal.hidden
+            ) {
+                closeNoteModal();
+            }
+        });
+
+        return modal;
+    }
+
+    function openNoteModal(customerCode, customerName) {
+        if (!activeProfileCode) {
+            return;
+        }
+
+        const modal = ensureNoteModal();
+        const isArabic = utils.getLanguage() !== "en";
+
+        noteModalCustomerCode = customerCode;
+
+        const existing =
+            window.DashboardNotes?.get(
+                customerCode,
+                activeProfileCode
+            ) || null;
+
+        utils.byId("customerNoteModalTitle").textContent =
+            isArabic ? "ملاحظات العميل" : "Customer Notes";
+
+        utils.byId("customerNoteModalCustomer").textContent =
+            `${customerCode} - ${customerName}`;
+
+        const textArea = utils.byId("customerNoteModalText");
+
+        textArea.value = existing?.note || "";
+        textArea.placeholder = isArabic
+            ? "اكتب ملاحظتك على العميل هنا..."
+            : "Write your note about this customer...";
+
+        utils.byId("customerNoteModalCounter").textContent =
+            `${textArea.value.length} / 1000`;
+
+        utils.byId("customerNoteModalInfo").textContent =
+            existing
+                ? (isArabic
+                      ? `آخر تحديث: ${existing.updatedBy || ""} — ${existing.updatedAt || ""}`
+                      : `Last update: ${existing.updatedBy || ""} — ${existing.updatedAt || ""}`)
+                : "";
+
+        const deleteButton = modal.querySelector(".customer-note-delete");
+        deleteButton.textContent = isArabic ? "حذف الملاحظة" : "Delete";
+        deleteButton.hidden = !existing;
+
+        modal.querySelector(".customer-note-cancel").textContent =
+            isArabic ? "إلغاء" : "Cancel";
+
+        modal.querySelector(".customer-note-save").textContent =
+            isArabic ? "حفظ" : "Save";
+
+        modal.dir = isArabic ? "rtl" : "ltr";
+        modal.hidden = false;
+
+        window.setTimeout(() => textArea.focus(), 30);
+    }
+
+    function closeNoteModal() {
+        const modal = utils.byId("customerNoteModal");
+
+        if (modal && !noteModalSaving) {
+            modal.hidden = true;
+        }
+    }
+
+    async function submitNote(text) {
+        if (noteModalSaving) {
+            return;
+        }
+
+        const modal = ensureNoteModal();
+        const isArabic = utils.getLanguage() !== "en";
+        const saveButton = modal.querySelector(".customer-note-save");
+
+        noteModalSaving = true;
+        saveButton.disabled = true;
+        saveButton.textContent = isArabic ? "جاري الحفظ..." : "Saving...";
+
+        try {
+            await window.DashboardNotes.save(
+                noteModalCustomerCode,
+                activeProfileCode,
+                String(text || "").trim()
+            );
+
+            noteModalSaving = false;
+            closeNoteModal();
+
+            utils.showToast(
+                isArabic ? "تم حفظ الملاحظة" : "Note saved",
+                "success"
+            );
+        } catch (error) {
+            console.error(error);
+
+            utils.showToast(
+                (isArabic ? "تعذر حفظ الملاحظة: " : "Could not save the note: ") +
+                    (error?.message || ""),
+                "error"
+            );
+        } finally {
+            noteModalSaving = false;
+            saveButton.disabled = false;
+            saveButton.textContent = isArabic ? "حفظ" : "Save";
+        }
+    }
+
+    function createCustomerRow(customer, options = {}) {
+        const forPrint =
+            options?.forPrint === true;
         const statusInfo =
             getCustomerStatusInfo(customer);
 
@@ -19845,6 +20865,13 @@ window.DashboardProfiles = (() => {
                         )}
                     </span>
                 </td>
+
+                <td class="customer-note-cell">
+                    ${renderNoteCell(
+                        customer,
+                        forPrint
+                    )}
+                </td>
             </tr>
         `;
     }
@@ -19867,11 +20894,12 @@ window.DashboardProfiles = (() => {
             filteredCustomers.length > 0
                 ? filteredCustomers
                       .map(
-                          createCustomerRow
+                          customer =>
+                              createCustomerRow(customer)
                       )
                       .join("")
                 : utils.emptyTableRow(
-                      12,
+                      13,
                       utils.t(
                           "common.noData",
                           "لا توجد بيانات متاحة"
@@ -19889,6 +20917,9 @@ window.DashboardProfiles = (() => {
 
         const profile =
             buildProfile(code);
+
+        activeProfileCode =
+            profile.code || code;
 
         profile.salesmanAlerts =
             buildSalesmanAlerts(profile);
@@ -20040,7 +21071,10 @@ window.DashboardProfiles = (() => {
                 Status:
                     customer.overdue > 0
                         ? "Overdue"
-                        : "Active"
+                        : "Active",
+
+                Notes:
+                    getCustomerNote(customer)?.note || ""
             })
         );
     }
@@ -20093,7 +21127,12 @@ window.DashboardProfiles = (() => {
             );
 
         const bodyRows = rows
-            .map(createCustomerRow)
+            .map(customer =>
+                createCustomerRow(
+                    customer,
+                    { forPrint: true }
+                )
+            )
             .join("");
 
         // Sales generated by each activity customer during the currently
@@ -20548,6 +21587,7 @@ window.DashboardProfiles = (() => {
                             <th>Credit Limit</th>
                             <th>Next Invoice</th>
                             <th>Status</th>
+                            <th>Notes</th>
                         </tr>
                     </thead>
 
@@ -20644,6 +21684,32 @@ window.DashboardProfiles = (() => {
             "click",
             printProfile
         );
+
+        utils.byId(
+            "profileCustomersTableBody"
+        )?.addEventListener(
+            "click",
+            event => {
+                const button = event.target.closest(
+                    ".customer-note-button"
+                );
+
+                if (!button) {
+                    return;
+                }
+
+                openNoteModal(
+                    button.dataset.customerCode || "",
+                    button.dataset.customerName || ""
+                );
+            }
+        );
+
+        window.DashboardNotes?.onChange(() => {
+            if (activeProfileCode) {
+                render();
+            }
+        });
 
         eventsBound = true;
     }
