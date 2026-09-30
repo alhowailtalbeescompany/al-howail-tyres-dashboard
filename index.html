@@ -21410,6 +21410,63 @@ window.DashboardProfiles = (() => {
                     th {
                         background: #f3f6f8;
                     }
+
+                    /* جدول العملاء: كل الأعمدة (حتى الحالة والملاحظات) داخل الصفحة */
+                    .customers-table {
+                        table-layout: auto;
+                        font-size: 10.5px;
+                    }
+
+                    .customers-table th,
+                    .customers-table td {
+                        padding: 5px 4px;
+                        word-break: normal;
+                        overflow-wrap: normal;
+                    }
+
+                    .customers-table td:last-child {
+                        overflow-wrap: anywhere;
+                    }
+
+                    .customers-table td {
+                        white-space: nowrap;
+                    }
+
+                    .customers-table td:nth-child(2) {
+                        white-space: normal;
+                        min-width: 150px;
+                        text-align: start;
+                    }
+
+                    .customers-table th:last-child,
+                    .customers-table td:last-child {
+                        white-space: normal;
+                        min-width: 140px;
+                        max-width: 220px;
+                        text-align: start;
+                    }
+
+                    thead {
+                        display: table-header-group;
+                    }
+
+                    tr {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                    }
+
+                    @page {
+                        size: A4 landscape;
+                        margin: 10mm;
+                    }
+
+                    @media print {
+                        body {
+                            padding: 0;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                    }
                 </style>
             </head>
 
@@ -21572,7 +21629,7 @@ window.DashboardProfiles = (() => {
                 </table>
 
                 <h2 style="margin:22px 0 10px;font-size:18px;">Customers List</h2>
-                <table>
+                <table class="customers-table">
                     <thead>
                         <tr>
                             <th>Customer Code</th>
