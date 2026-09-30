@@ -6393,8 +6393,8 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
                         <div class="profile-kpi-grid">
 
                             <article class="profile-kpi-card">
-                                <span data-i18n="salesmanProfiles.monthlyTarget">
-                                    الهدف الشهري
+                                <span data-i18n="targets.periodTarget">
+                                    هدف الفترة
                                 </span>
 
                                 <strong id="profileTargetValue">
@@ -17246,6 +17246,20 @@ window.DashboardTargets = (() => {
         return periodRange ? { ...periodRange } : null;
     }
 
+    /*
+     * هدف الفترة المختارة لصف Target خام (يستخدمه ملف المندوب).
+     */
+    function getSelectedPeriodTarget(row) {
+        if (!row) {
+            return 0;
+        }
+
+        return getPeriodTarget(
+            normalizeTargetRow(row),
+            getQuarter(referenceDate)
+        );
+    }
+
     function isInPeriod(value) {
         if (!periodRange) {
             return isSameMonth(value, referenceDate);
@@ -18739,6 +18753,7 @@ ${branchRows.length > 1 ? `
     ===================================================== */
 
     return Object.freeze({
+        getSelectedPeriodTarget,
         exportPdf,
         initialize,
         bindEvents,
@@ -19177,6 +19192,22 @@ window.DashboardProfiles = (() => {
     function getCurrentMonthlyTarget(targetRow) {
         if (!targetRow) {
             return 0;
+        }
+
+        /*
+         * هدف الفترة المختارة من الفلاتر (مجموع الأهداف الشهرية
+         * لشهور الفترة) بنفس حساب صفحة الأهداف.
+         */
+        if (
+            targetsModule &&
+            typeof targetsModule.getSelectedPeriodTarget ===
+                "function"
+        ) {
+            return utils.toNumber(
+                targetsModule.getSelectedPeriodTarget(
+                    targetRow
+                )
+            );
         }
 
         if (
@@ -21367,6 +21398,7 @@ window.DashboardProfiles = (() => {
 
                     .trend-chart-image {
                         display: block;
+                        box-sizing: border-box;
                         width: 100%;
                         max-width: 100%;
                         height: 340px;
