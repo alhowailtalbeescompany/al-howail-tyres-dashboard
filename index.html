@@ -4139,6 +4139,71 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
     }
 }
 
+
+/* =========================================================
+   Presentation page
+========================================================= */
+
+.presentation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.presentation-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.presentation-note {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--gradient-brand-soft, rgba(28, 149, 184, 0.08));
+    color: var(--text-secondary, #5b6b78);
+    font-size: 0.9rem;
+}
+
+.presentation-note strong {
+    margin-inline-start: auto;
+    color: var(--text-primary, #0c2e42);
+}
+
+.presentation-empty {
+    padding: 48px 16px;
+    text-align: center;
+    color: var(--text-secondary, #5b6b78);
+}
+
+.presentation-stage {
+    border-radius: 12px;
+    overflow: hidden;
+    background: #e6ecf0;
+}
+
+.presentation-stage iframe {
+    display: block;
+    width: 100%;
+    min-height: 480px;
+    border: 0;
+    background: #e6ecf0;
+}
+
+@media (max-width: 640px) {
+    .presentation-actions,
+    .presentation-actions button {
+        width: 100%;
+    }
+
+    .presentation-actions button {
+        justify-content: center;
+    }
+}
 </style>
 </head>
 
@@ -4561,6 +4626,18 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
 
                     <span data-i18n="navigation.reports">
                         التقارير
+                    </span>
+                </button>
+
+                <button
+                    class="navigation-item management-only"
+                    type="button"
+                    data-page="presentation"
+                >
+                    <i class="fa-solid fa-person-chalkboard"></i>
+
+                    <span data-i18n="navigation.presentation">
+                        العرض التقديمي
                     </span>
                 </button>
 
@@ -6672,6 +6749,88 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
 
 
                 <!-- =====================================
+                     Presentation
+                ====================================== -->
+
+                <section
+                    class="page-section hidden"
+                    id="presentationPage"
+                    data-page-section="presentation"
+                >
+
+                    <article class="content-card">
+
+                        <div class="card-header">
+                            <div>
+                                <h3 data-i18n="presentation.title">
+                                    العرض التقديمي للإدارة
+                                </h3>
+
+                                <p data-i18n="presentation.subtitle">
+                                    عرض شامل لأداء الفروع جاهز للطباعة أو العرض على الشاشة
+                                </p>
+                            </div>
+
+                            <div class="card-actions presentation-actions">
+                                <button
+                                    class="secondary-button"
+                                    type="button"
+                                    id="presentationPresentButton"
+                                >
+                                    <i class="fa-solid fa-display"></i>
+                                    <span data-i18n="presentation.present">
+                                        عرض ملء الشاشة
+                                    </span>
+                                </button>
+
+                                <button
+                                    class="primary-button"
+                                    type="button"
+                                    id="presentationPrintButton"
+                                >
+                                    <i class="fa-solid fa-print"></i>
+                                    <span data-i18n="presentation.print">
+                                        طباعة / حفظ PDF
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="presentation-note">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span data-i18n="presentation.note">
+                                يعتمد العرض على الفترة والفرع المحددين في الفلاتر أعلى الصفحة، وتظهر المديونية والمتأخرات بالرصيد الحالي.
+                            </span>
+                            <strong id="presentationInfo"></strong>
+                        </div>
+
+                        <div
+                            class="presentation-empty"
+                            id="presentationEmpty"
+                        >
+                            <span data-i18n="presentation.empty">
+                                لا توجد بيانات بعد. حمّل البيانات لعرض الشرائح.
+                            </span>
+                        </div>
+
+                        <div
+                            class="presentation-stage"
+                            id="presentationStage"
+                            style="display:none"
+                        >
+                            <iframe
+                                id="presentationFrame"
+                                title="Presentation"
+                                allowfullscreen
+                            ></iframe>
+                        </div>
+
+                    </article>
+
+                </section>
+
+
+                <!-- =====================================
                      Settings
                 ====================================== -->
 
@@ -6994,7 +7153,17 @@ const TRANSLATIONS = {
             salesIntelligence: "ذكاء المبيعات",
             alerts: "مركز التنبيهات",
             reports: "التقارير",
+            presentation: "العرض التقديمي",
             settings: "الإعدادات"
+        },
+
+        presentation: {
+            title: "العرض التقديمي للإدارة",
+            subtitle: "عرض شامل لأداء الفروع جاهز للطباعة أو العرض على الشاشة",
+            present: "عرض ملء الشاشة",
+            print: "طباعة / حفظ PDF",
+            note: "يعتمد العرض على الفترة والفرع المحددين في الفلاتر أعلى الصفحة، وتظهر المديونية والمتأخرات بالرصيد الحالي.",
+            empty: "لا توجد بيانات بعد. حمّل البيانات لعرض الشرائح."
         },
 
         dashboard: {
@@ -7346,7 +7515,17 @@ const TRANSLATIONS = {
             salesIntelligence: "Sales Intelligence",
             alerts: "Alerts Center",
             reports: "Reports",
+            presentation: "Presentation",
             settings: "Settings"
+        },
+
+        presentation: {
+            title: "Management presentation",
+            subtitle: "A full branch performance deck, ready to print or present on screen",
+            present: "Present full screen",
+            print: "Print / Save as PDF",
+            note: "The deck uses the period and branch selected in the filters above. Receivables and overdue show the current balance.",
+            empty: "No data yet. Load the data to build the slides."
         },
 
         dashboard: {
@@ -27878,6 +28057,1924 @@ window.DashboardSalesIntelligence = (() => {
 
 </script>
 <script>
+/* ===== presentation.js ===== */
+"use strict";
+
+/* =========================================================
+   Management Presentation
+   عرض تقديمي شامل للفروع قابل للطباعة والعرض بملء الشاشة
+========================================================= */
+
+window.DashboardPresentation = (() => {
+    const utils = window.DashboardUtils;
+    const auth = window.DashboardAuth;
+
+    const SLIDE_WIDTH = 1122;
+    const SLIDE_HEIGHT = 793;
+
+    const TEXT = {
+        ar: {
+            deckTitle: "مراجعة أداء الفروع",
+            deckSubtitle: "المبيعات والأهداف والتحصيل والمديونيات",
+            preparedOn: "تاريخ الإعداد",
+            preparedBy: "إعداد",
+            period: "الفترة",
+            scope: "النطاق",
+            periodAll: "كل البيانات المتاحة",
+            periodFromTo: "من {from} إلى {to}",
+            scopeAll: "جميع الفروع",
+            scopeBranch: "فرع {branch}",
+            page: "صفحة {n} من {total}",
+            overviewTitle: "ملخص الأداء العام",
+            overviewSub: "أرقام الشركة للفترة المختارة",
+            sales: "صافي المبيعات",
+            target: "الهدف",
+            achievement: "نسبة التحقيق",
+            collections: "التحصيلات",
+            collectionRate: "نسبة التحصيل",
+            outstanding: "إجمالي المديونية",
+            overdue: "المتأخرات",
+            overdueShare: "نسبة المتأخر",
+            notDueValue: "غير مستحق بعد: {value}",
+            invoices: "عدد الفواتير",
+            activeCustomers: "العملاء النشطون",
+            newCustomers: "عملاء جدد",
+            reactivated: "عملاء معاد تنشيطهم",
+            quantity: "الكمية المباعة",
+            keyFigures: "النشاط",
+            highlights: "أبرز النقاط",
+            remaining: "المتبقي للهدف {value}",
+            above: "أعلى من الهدف بـ {value}",
+            ofSales: "من صافي المبيعات",
+            ofOutstanding: "من إجمالي المديونية",
+            hlTopAchiever: "أعلى تحقيق للهدف: فرع {branch} بنسبة {pct}.",
+            hlLowAchiever: "أقل تحقيق للهدف: فرع {branch} بنسبة {pct}.",
+            hlTopSales: "أعلى مبيعات: فرع {branch} بقيمة {value} ر.س.",
+            hlOverdue: "أعلى نسبة متأخرات: فرع {branch} بنسبة {pct} من مديونيته.",
+            hlSalesman: "أفضل مندوب: {name} ({branch}) بنسبة تحقيق {pct}.",
+            hlCustomers: "{new} عميل جديد و{re} عميل معاد تنشيطه خلال الفترة.",
+            compareTitle: "مقارنة الفروع",
+            compareSub: "الفروع جنبًا إلى جنب مرتبة حسب صافي المبيعات",
+            branch: "الفرع",
+            total: "الإجمالي",
+            chartsTitle: "الفروع في رسوم بيانية",
+            chartsSub: "التحقيق والتحصيل والمتأخرات لكل فرع",
+            chartSalesTarget: "صافي المبيعات مقابل الهدف",
+            chartTargetMark: "علامة الهدف",
+            chartOverdue: "نسبة المتأخرات من مديونية الفرع",
+            chartCollection: "التحصيلات كنسبة من المبيعات",
+            salesmenTitle: "ترتيب المندوبين",
+            salesmenSub: "مرتبون حسب نسبة تحقيق الهدف",
+            salesman: "المندوب",
+            noTarget: "بدون هدف",
+            branchRank: "المركز {rank} من {total} حسب صافي المبيعات",
+            branchCustomers: "{new} عميل جديد و{re} معاد تنشيطه",
+            branchSalesmen: "المندوبون",
+            topCustomers: "أعلى 5 عملاء مبيعًا",
+            topOverdue: "أعلى 5 عملاء متأخرات",
+            topProducts: "أعلى 5 منتجات",
+            customer: "العميل",
+            product: "المنتج",
+            qty: "الكمية",
+            value: "القيمة",
+            balance: "الرصيد",
+            days: "أيام التأخير",
+            agingTitle: "أعمار المديونية وأولويات التحصيل",
+            agingSub: "الرصيد الحالي بغض النظر عن فترة الفلتر",
+            notDue: "غير مستحق",
+            bucket1: "1 - 30 يوم",
+            bucket2: "31 - 60",
+            bucket3: "61 - 90",
+            bucket4: "91 - 180",
+            bucket5: "أكثر من 180",
+            priorityTitle: "أكبر العملاء متأخرات على مستوى الشركة",
+            none: "لا توجد بيانات لهذه الفترة",
+            currencyNote: "المبالغ بالريال السعودي، والمبيعات بدون ضريبة القيمة المضافة",
+            unassigned: "غير محدد",
+            prev: "السابق",
+            next: "التالي",
+            exit: "خروج",
+            slides: "{count} شريحة جاهزة",
+            continued: "({n} من {total})",
+            emptyDeck: "لا توجد بيانات لعرضها بعد.",
+            fullscreenUnsupported: "المتصفح لا يدعم العرض بملء الشاشة.",
+            printFailed: "تعذرت الطباعة. جرّب متصفح Chrome أو Edge."
+        },
+        en: {
+            deckTitle: "Branch Performance Review",
+            deckSubtitle: "Sales, targets, collections and receivables",
+            preparedOn: "Prepared on",
+            preparedBy: "Prepared by",
+            period: "Period",
+            scope: "Scope",
+            periodAll: "All available data",
+            periodFromTo: "{from} to {to}",
+            scopeAll: "All branches",
+            scopeBranch: "{branch} branch",
+            page: "Page {n} of {total}",
+            overviewTitle: "Company overview",
+            overviewSub: "Headline figures for the selected period",
+            sales: "Net sales",
+            target: "Target",
+            achievement: "Achievement",
+            collections: "Collections",
+            collectionRate: "Collection rate",
+            outstanding: "Total receivables",
+            overdue: "Overdue",
+            overdueShare: "Overdue share",
+            notDueValue: "Not yet due: {value}",
+            invoices: "Invoices",
+            activeCustomers: "Active customers",
+            newCustomers: "New customers",
+            reactivated: "Reactivated customers",
+            quantity: "Units sold",
+            keyFigures: "Activity",
+            highlights: "Highlights",
+            remaining: "{value} left to reach target",
+            above: "{value} above target",
+            ofSales: "Of net sales",
+            ofOutstanding: "Of total receivables",
+            hlTopAchiever: "Best achievement: {branch} at {pct} of target.",
+            hlLowAchiever: "Lowest achievement: {branch} at {pct} of target.",
+            hlTopSales: "Highest sales: {branch} with SAR {value}.",
+            hlOverdue: "Highest overdue share: {branch}, {pct} of its receivables.",
+            hlSalesman: "Top salesman: {name} ({branch}) at {pct} of target.",
+            hlCustomers: "{new} new and {re} reactivated customers in the period.",
+            compareTitle: "Branch comparison",
+            compareSub: "Side by side, ranked by net sales",
+            branch: "Branch",
+            total: "Total",
+            chartsTitle: "Branches at a glance",
+            chartsSub: "Achievement, collection and overdue by branch",
+            chartSalesTarget: "Net sales against target",
+            chartTargetMark: "Target marker",
+            chartOverdue: "Overdue share of branch receivables",
+            chartCollection: "Collections as a share of sales",
+            salesmenTitle: "Salesman ranking",
+            salesmenSub: "Ranked by target achievement",
+            salesman: "Salesman",
+            noTarget: "No target",
+            branchRank: "Rank {rank} of {total} by net sales",
+            branchCustomers: "{new} new and {re} reactivated customers",
+            branchSalesmen: "Salesmen",
+            topCustomers: "Top 5 customers by sales",
+            topOverdue: "Top 5 overdue customers",
+            topProducts: "Top 5 products",
+            customer: "Customer",
+            product: "Product",
+            qty: "Qty",
+            value: "Value",
+            balance: "Balance",
+            days: "Days late",
+            agingTitle: "Receivables aging and collection priorities",
+            agingSub: "Current balances, independent of the date filter",
+            notDue: "Not due",
+            bucket1: "1 - 30 days",
+            bucket2: "31 - 60",
+            bucket3: "61 - 90",
+            bucket4: "91 - 180",
+            bucket5: "Over 180",
+            priorityTitle: "Largest overdue customers across the company",
+            none: "No data for this period",
+            currencyNote: "Amounts in SAR. Sales exclude VAT.",
+            unassigned: "Unassigned",
+            prev: "Previous",
+            next: "Next",
+            exit: "Exit",
+            slides: "{count} slides ready",
+            continued: "({n} of {total})",
+            emptyDeck: "There is no data to present yet.",
+            fullscreenUnsupported: "This browser does not support full screen.",
+            printFailed: "Printing failed. Try Chrome or Edge."
+        }
+    };
+
+    const state = {
+        data: null,
+        balanceRows: [],
+        lastHTML: "",
+        slideCount: 0,
+        currentSlide: 0,
+        presenting: false,
+        dirty: true,
+        initialized: false
+    };
+
+    /* =====================================================
+       Helpers
+    ===================================================== */
+
+    function language() {
+        return utils.getLanguage() === "en" ? "en" : "ar";
+    }
+
+    function tx(key, vars) {
+        const dictionary = TEXT[language()] || TEXT.ar;
+        let value = dictionary[key] ?? TEXT.en[key] ?? key;
+
+        if (vars) {
+            value = value.replace(/\{(\w+)\}/g, (match, name) =>
+                vars[name] == null ? "" : String(vars[name])
+            );
+        }
+
+        return value;
+    }
+
+    function esc(value) {
+        return utils.escapeHTML(value == null ? "" : String(value));
+    }
+
+    function toNum(value) {
+        return utils.toNumber(value);
+    }
+
+    function clean(value) {
+        return String(value == null ? "" : value)
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    const integerFormat = new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 0
+    });
+
+    function fmtInt(value) {
+        return integerFormat.format(Math.round(toNum(value)));
+    }
+
+    function fmtCompact(value) {
+        const number = toNum(value);
+        const absolute = Math.abs(number);
+
+        if (absolute >= 1e6) {
+            return (number / 1e6).toFixed(2) + "M";
+        }
+
+        if (absolute >= 1e4) {
+            return (number / 1e3).toFixed(1) + "K";
+        }
+
+        return fmtInt(number);
+    }
+
+    function fmtPct(value) {
+        return value == null || !isFinite(value)
+            ? "—"
+            : "\u2066" + value.toFixed(1) + "%\u2069";
+    }
+
+    function ratio(part, whole) {
+        return whole > 0 ? (part / whole) * 100 : null;
+    }
+
+    function achievementTone(percent) {
+        if (percent == null) return "is-none";
+        if (percent >= 100) return "is-good";
+        if (percent >= 80) return "is-warn";
+        return "is-bad";
+    }
+
+    function overdueTone(percent) {
+        if (percent == null) return "is-none";
+        if (percent <= 20) return "is-good";
+        if (percent <= 40) return "is-warn";
+        return "is-bad";
+    }
+
+    function parseIso(value) {
+        const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+        if (!match) {
+            return null;
+        }
+
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+
+    function toIso(date) {
+        return (
+            date.getFullYear() +
+            "-" +
+            String(date.getMonth() + 1).padStart(2, "0") +
+            "-" +
+            String(date.getDate()).padStart(2, "0")
+        );
+    }
+
+    function fmtDate(value) {
+        const date = value instanceof Date ? value : parseIso(value);
+
+        if (!date) {
+            return String(value || "");
+        }
+
+        const locale =
+            language() === "en"
+                ? "en-GB"
+                : "ar-SA-u-ca-gregory-nu-latn";
+
+        return new Intl.DateTimeFormat(locale, {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+        }).format(date);
+    }
+
+    function chunk(list, size) {
+        const groups = [];
+
+        for (let index = 0; index < list.length; index += size) {
+            groups.push(list.slice(index, index + size));
+        }
+
+        return groups.length ? groups : [[]];
+    }
+
+    function width(value, max) {
+        if (!(max > 0)) return "0";
+        return Math.max(0, Math.min(100, (value / max) * 100)).toFixed(2);
+    }
+
+    function getLogo() {
+        const image = document.querySelector(".sidebar-brand-logo img");
+        return image?.getAttribute("src") || "";
+    }
+
+    /* =====================================================
+       Data model
+    ===================================================== */
+
+    function resolvePeriod(filters, invoices) {
+        let from = clean(filters?.dateFrom);
+        let to = clean(filters?.dateTo);
+        let derived = false;
+
+        if (!from && !to) {
+            const dates = invoices
+                .map(row => String(row.invoiceDate || "").slice(0, 10))
+                .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value))
+                .sort();
+
+            if (dates.length) {
+                from = dates[0];
+                to = dates[dates.length - 1];
+                derived = true;
+            }
+        }
+
+        if (!from && !to) {
+            from = to = toIso(new Date());
+            derived = true;
+        }
+
+        from = from || to;
+        to = to || from;
+
+        if (from > to) {
+            [from, to] = [to, from];
+        }
+
+        const months = [];
+        let year = Number(from.slice(0, 4));
+        let month = Number(from.slice(5, 7));
+        const endYear = Number(to.slice(0, 4));
+        const endMonth = Number(to.slice(5, 7));
+        let guard = 0;
+
+        while (
+            (year < endYear || (year === endYear && month <= endMonth)) &&
+            guard < 60
+        ) {
+            months.push(month);
+            month += 1;
+
+            if (month > 12) {
+                month = 1;
+                year += 1;
+            }
+
+            guard += 1;
+        }
+
+        return { from, to, derived, months };
+    }
+
+    function monthlyTarget(row, month) {
+        const quarter = month <= 3 ? 1 : month <= 6 ? 2 : month <= 9 ? 3 : 4;
+        return toNum(row["monthlyTargetQ" + quarter]);
+    }
+
+    function agingIndex(row) {
+        if (String(row.status || "").toLowerCase() !== "overdue") {
+            return 0;
+        }
+
+        const days = toNum(row.overdueDays);
+
+        if (days <= 30) return 1;
+        if (days <= 60) return 2;
+        if (days <= 90) return 3;
+        if (days <= 180) return 4;
+        return 5;
+    }
+
+    function newAggregate(name) {
+        return {
+            name,
+            sales: 0,
+            target: 0,
+            collections: 0,
+            outstanding: 0,
+            due: 0,
+            overdue: 0,
+            quantity: 0,
+            newCustomers: 0,
+            reactivated: 0,
+            invoiceSet: new Set(),
+            customerSet: new Set(),
+            aging: [0, 0, 0, 0, 0, 0],
+            customerSales: new Map(),
+            productSales: new Map(),
+            overdueCustomers: new Map()
+        };
+    }
+
+    function addKeyed(map, key, label, amount, quantity, extra) {
+        if (!key) {
+            return;
+        }
+
+        let entry = map.get(key);
+
+        if (!entry) {
+            entry = {
+                key,
+                label: label || key,
+                amount: 0,
+                quantity: 0,
+                days: 0,
+                branch: "",
+                salesman: ""
+            };
+            map.set(key, entry);
+        }
+
+        entry.amount += amount;
+        entry.quantity += quantity || 0;
+
+        if (extra) {
+            entry.days = Math.max(entry.days, extra.days || 0);
+            entry.branch = entry.branch || extra.branch || "";
+            entry.salesman = entry.salesman || extra.salesman || "";
+        }
+    }
+
+    function topEntries(map, count) {
+        return [...map.values()]
+            .filter(entry => entry.amount > 0)
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, count);
+    }
+
+    function buildModel() {
+        const data = state.data || {};
+        const invoices = data.invoices || [];
+        const collections = data.collections || [];
+        const balances = state.balanceRows || [];
+        const targets = data.target || [];
+        const period = resolvePeriod(data.filters, invoices);
+        const unassigned = tx("unassigned");
+
+        const branches = new Map();
+        const salesmen = new Map();
+        const company = newAggregate(tx("scopeAll"));
+
+        const branchOf = name => {
+            const key = clean(name) || unassigned;
+
+            if (!branches.has(key)) {
+                branches.set(key, newAggregate(key));
+            }
+
+            return branches.get(key);
+        };
+
+        const salesmanOf = (code, name, branch) => {
+            const key = clean(code) || "—";
+            let salesman = salesmen.get(key);
+
+            if (!salesman) {
+                salesman = {
+                    code: key,
+                    name: clean(name) || key,
+                    branch: clean(branch) || unassigned,
+                    sales: 0,
+                    target: 0,
+                    collections: 0,
+                    outstanding: 0,
+                    overdue: 0
+                };
+                salesmen.set(key, salesman);
+            } else if (salesman.name === salesman.code && clean(name)) {
+                salesman.name = clean(name);
+            }
+
+            return salesman;
+        };
+
+        targets.forEach(row => {
+            const periodTarget = period.months.reduce(
+                (sum, month) => sum + monthlyTarget(row, month),
+                0
+            );
+
+            branchOf(row.branch).target += periodTarget;
+            company.target += periodTarget;
+            salesmanOf(row.salesmanCode, row.salesmanName, row.branch).target += periodTarget;
+        });
+
+        invoices.forEach(row => {
+            const amount = toNum(row.salesWithoutTax);
+            const quantity = toNum(row.invoiceQuantity);
+            const customerKey = clean(row.customerCode) || clean(row.customerName);
+            const productKey = clean(row.productCode) || clean(row.productDescription);
+            const invoiceKey = clean(row.invoiceNo);
+            const productLabel = clean(row.productDescription) || clean(row.productCode);
+
+            [branchOf(row.branch), company].forEach(aggregate => {
+                aggregate.sales += amount;
+                aggregate.quantity += quantity;
+
+                if (invoiceKey) aggregate.invoiceSet.add(invoiceKey);
+                if (customerKey) aggregate.customerSet.add(customerKey);
+
+                addKeyed(aggregate.customerSales, customerKey, clean(row.customerName), amount, quantity);
+                addKeyed(aggregate.productSales, productKey, productLabel, amount, quantity);
+            });
+
+            salesmanOf(row.salesmanCode, row.salesmanName, row.branch).sales += amount;
+        });
+
+        collections.forEach(row => {
+            const amount = toNum(row.collectionAmount);
+
+            branchOf(row.branch).collections += amount;
+            company.collections += amount;
+            salesmanOf(row.salesmanCode, row.salesmanName, row.branch).collections += amount;
+        });
+
+        balances.forEach(row => {
+            const balance = toNum(row.invoiceBalance);
+            const isOverdue = String(row.status || "").toLowerCase() === "overdue";
+            const bucket = agingIndex(row);
+            const customerKey = clean(row.customerCode) || clean(row.customerName);
+            const extra = {
+                days: toNum(row.overdueDays),
+                branch: clean(row.branch) || unassigned,
+                salesman: clean(row.salesmanName)
+            };
+
+            [branchOf(row.branch), company].forEach(aggregate => {
+                aggregate.outstanding += balance;
+                aggregate.aging[bucket] += balance;
+
+                if (isOverdue) {
+                    aggregate.overdue += balance;
+                    addKeyed(aggregate.overdueCustomers, customerKey, clean(row.customerName), balance, 0, extra);
+                } else {
+                    aggregate.due += balance;
+                }
+            });
+
+            const salesman = salesmanOf(row.salesmanCode, row.salesmanName, row.branch);
+            salesman.outstanding += balance;
+
+            if (isOverdue) {
+                salesman.overdue += balance;
+            }
+        });
+
+        (data.newCustomers || []).forEach(row => {
+            branchOf(row.branch).newCustomers += 1;
+            company.newCustomers += 1;
+        });
+
+        (data.reactivatedCustomers || []).forEach(row => {
+            branchOf(row.branch).reactivated += 1;
+            company.reactivated += 1;
+        });
+
+        const branchList = [...branches.values()]
+            .filter(branch =>
+                branch.sales ||
+                branch.target ||
+                branch.collections ||
+                branch.outstanding ||
+                branch.newCustomers ||
+                branch.reactivated
+            )
+            .sort((a, b) => b.sales - a.sales || b.target - a.target);
+
+        const salesmanList = [...salesmen.values()].filter(salesman =>
+            salesman.sales ||
+            salesman.target ||
+            salesman.collections ||
+            salesman.outstanding
+        );
+
+        return {
+            period,
+            company,
+            branches: branchList,
+            salesmen: salesmanList,
+            scopeBranch: clean(data.filters?.branch)
+        };
+    }
+
+    /* =====================================================
+       Slide parts
+    ===================================================== */
+
+    function kpi(label, value, note, tone) {
+        return `
+            <div class="pz-kpi ${tone || ""}">
+                <span>${esc(label)}</span>
+                <strong>${esc(value)}</strong>
+                ${note ? `<small>${esc(note)}</small>` : ""}
+            </div>`;
+    }
+
+    function meter(percent) {
+        const fill = percent == null ? 0 : Math.max(0, Math.min(100, percent));
+
+        return `
+            <div class="pz-meter ${achievementTone(percent)}">
+                <span class="pz-meter-track"><i style="width:${fill.toFixed(1)}%"></i></span>
+                <b>${fmtPct(percent)}</b>
+            </div>`;
+    }
+
+    function clip(value) {
+        return `<span class="pz-clip">${esc(value)}</span>`;
+    }
+
+    function emptyRow(columns) {
+        return `<tr><td class="pz-empty-cell" colspan="${columns}">${esc(tx("none"))}</td></tr>`;
+    }
+
+    function targetGap(sales, target, format = fmtInt) {
+        if (!(target > 0)) {
+            return "";
+        }
+
+        return sales >= target
+            ? tx("above", { value: format(sales - target) })
+            : tx("remaining", { value: format(target - sales) });
+    }
+
+    function highlights(model) {
+        const items = [];
+        const withTarget = model.branches.filter(branch => branch.target > 0);
+
+        if (withTarget.length) {
+            const ranked = [...withTarget].sort(
+                (a, b) => ratio(b.sales, b.target) - ratio(a.sales, a.target)
+            );
+            const best = ranked[0];
+            const worst = ranked[ranked.length - 1];
+
+            items.push(tx("hlTopAchiever", { branch: best.name, pct: fmtPct(ratio(best.sales, best.target)) }));
+
+            if (worst !== best) {
+                items.push(tx("hlLowAchiever", { branch: worst.name, pct: fmtPct(ratio(worst.sales, worst.target)) }));
+            }
+        }
+
+        if (model.branches.length && model.branches[0].sales > 0) {
+            items.push(tx("hlTopSales", { branch: model.branches[0].name, value: fmtInt(model.branches[0].sales) }));
+        }
+
+        const withBalance = model.branches.filter(branch => branch.outstanding > 0);
+
+        if (withBalance.length) {
+            const worstOverdue = [...withBalance].sort(
+                (a, b) => ratio(b.overdue, b.outstanding) - ratio(a.overdue, a.outstanding)
+            )[0];
+
+            items.push(tx("hlOverdue", {
+                branch: worstOverdue.name,
+                pct: fmtPct(ratio(worstOverdue.overdue, worstOverdue.outstanding))
+            }));
+        }
+
+        const topSalesman = model.salesmen
+            .filter(salesman => salesman.target > 0)
+            .sort((a, b) => ratio(b.sales, b.target) - ratio(a.sales, a.target))[0];
+
+        if (topSalesman) {
+            items.push(tx("hlSalesman", {
+                name: topSalesman.name,
+                branch: topSalesman.branch,
+                pct: fmtPct(ratio(topSalesman.sales, topSalesman.target))
+            }));
+        }
+
+        items.push(tx("hlCustomers", {
+            new: fmtInt(model.company.newCustomers),
+            re: fmtInt(model.company.reactivated)
+        }));
+
+        return items;
+    }
+
+    /* =====================================================
+       Slides
+    ===================================================== */
+
+    function coverSlide(context) {
+        return `
+            <div class="pz-slide pz-cover">
+                <div class="pz-cover-main">
+                    <span class="pz-cover-rule"></span>
+                    <h1>${esc(tx("deckTitle"))}</h1>
+                    <p class="pz-cover-sub">${esc(tx("deckSubtitle"))}</p>
+                    <dl class="pz-cover-facts">
+                        <div><dt>${esc(tx("period"))}</dt><dd>${esc(context.periodLabel)}</dd></div>
+                        <div><dt>${esc(tx("scope"))}</dt><dd>${esc(context.scopeLabel)}</dd></div>
+                    </dl>
+                </div>
+                <div class="pz-cover-side">
+                    ${context.logo ? `<img class="pz-cover-logo" src="${esc(context.logo)}" alt="Al-Howail Tyres">` : `<strong class="pz-cover-name">Al-Howail Tyres</strong>`}
+                    <dl class="pz-cover-meta">
+                        <div><dt>${esc(tx("preparedOn"))}</dt><dd>${esc(fmtDate(new Date()))}</dd></div>
+                        ${context.user ? `<div><dt>${esc(tx("preparedBy"))}</dt><dd>${esc(context.user)}</dd></div>` : ""}
+                    </dl>
+                </div>
+            </div>`;
+    }
+
+    function overviewSlide(model) {
+        const company = model.company;
+        const achievement = ratio(company.sales, company.target);
+        const collectionRate = ratio(company.collections, company.sales);
+        const overdueShare = ratio(company.overdue, company.outstanding);
+
+        const stats = [
+            [tx("invoices"), fmtInt(company.invoiceSet.size)],
+            [tx("activeCustomers"), fmtInt(company.customerSet.size)],
+            [tx("newCustomers"), fmtInt(company.newCustomers)],
+            [tx("reactivated"), fmtInt(company.reactivated)],
+            [tx("quantity"), fmtInt(company.quantity)]
+        ];
+
+        return {
+            title: tx("overviewTitle"),
+            subtitle: tx("overviewSub"),
+            body: `
+                <div class="pz-kpis" style="--cols:4">
+                    ${kpi(tx("sales"), fmtCompact(company.sales), "SAR " + fmtInt(company.sales))}
+                    ${kpi(tx("target"), fmtCompact(company.target), "SAR " + fmtInt(company.target))}
+                    ${kpi(tx("achievement"), fmtPct(achievement), targetGap(company.sales, company.target), achievementTone(achievement))}
+                    ${kpi(tx("collections"), fmtCompact(company.collections), "SAR " + fmtInt(company.collections))}
+                    ${kpi(tx("collectionRate"), fmtPct(collectionRate), tx("ofSales"))}
+                    ${kpi(tx("outstanding"), fmtCompact(company.outstanding), tx("notDueValue", { value: fmtInt(company.due) }))}
+                    ${kpi(tx("overdue"), fmtCompact(company.overdue), "SAR " + fmtInt(company.overdue), overdueTone(overdueShare))}
+                    ${kpi(tx("overdueShare"), fmtPct(overdueShare), tx("ofOutstanding"), overdueTone(overdueShare))}
+                </div>
+                <div class="pz-split">
+                    <div class="pz-panel">
+                        <h3 class="pz-h3">${esc(tx("keyFigures"))}</h3>
+                        <div class="pz-stats">
+                            ${stats.map(([label, value]) => `<div class="pz-stat"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}
+                        </div>
+                    </div>
+                    <div class="pz-panel">
+                        <h3 class="pz-h3">${esc(tx("highlights"))}</h3>
+                        <ul class="pz-list">
+                            ${highlights(model).map(item => `<li>${esc(item)}</li>`).join("")}
+                        </ul>
+                    </div>
+                </div>`
+        };
+    }
+
+    function comparisonSlide(model) {
+        const row = branch => {
+            const achievement = ratio(branch.sales, branch.target);
+            const overdueShare = ratio(branch.overdue, branch.outstanding);
+
+            return `
+                <td class="pz-strong">${esc(branch.name)}</td>
+                <td class="n">${fmtInt(branch.sales)}</td>
+                <td class="n">${branch.target > 0 ? fmtInt(branch.target) : "—"}</td>
+                <td>${meter(achievement)}</td>
+                <td class="n">${fmtInt(branch.collections)}</td>
+                <td class="n">${fmtPct(ratio(branch.collections, branch.sales))}</td>
+                <td class="n">${fmtInt(branch.outstanding)}</td>
+                <td class="n">${fmtInt(branch.overdue)}</td>
+                <td class="n pz-tone ${overdueTone(overdueShare)}">${fmtPct(overdueShare)}</td>
+                <td class="n">${fmtInt(branch.newCustomers)}</td>
+                <td class="n">${fmtInt(branch.reactivated)}</td>`;
+        };
+
+        return {
+            title: tx("compareTitle"),
+            subtitle: tx("compareSub"),
+            body: `
+                <table class="pz-table pz-table-large">
+                    <thead>
+                        <tr>
+                            <th>${esc(tx("branch"))}</th>
+                            <th class="n">${esc(tx("sales"))}</th>
+                            <th class="n">${esc(tx("target"))}</th>
+                            <th>${esc(tx("achievement"))}</th>
+                            <th class="n">${esc(tx("collections"))}</th>
+                            <th class="n">${esc(tx("collectionRate"))}</th>
+                            <th class="n">${esc(tx("outstanding"))}</th>
+                            <th class="n">${esc(tx("overdue"))}</th>
+                            <th class="n">${esc(tx("overdueShare"))}</th>
+                            <th class="n">${esc(tx("newCustomers"))}</th>
+                            <th class="n">${esc(tx("reactivated"))}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${model.branches.length ? model.branches.map(branch => `<tr>${row(branch)}</tr>`).join("") : emptyRow(11)}
+                    </tbody>
+                    <tfoot>
+                        <tr>${row({ ...model.company, name: tx("total") })}</tr>
+                    </tfoot>
+                </table>`
+        };
+    }
+
+    function chartsSlide(model) {
+        const branches = model.branches;
+        const maxSales = Math.max(1, ...branches.map(branch => Math.max(branch.sales, branch.target)));
+
+        const salesBars = branches.map(branch => {
+            const achievement = ratio(branch.sales, branch.target);
+
+            return `
+                <div class="pz-bar-row">
+                    <span class="pz-bar-label">${esc(branch.name)}</span>
+                    <div class="pz-bar-track">
+                        <i class="pz-bar" style="width:${width(branch.sales, maxSales)}%"></i>
+                        ${branch.target > 0 ? `<b class="pz-bar-target" style="inset-inline-start:${width(branch.target, maxSales)}%"></b>` : ""}
+                    </div>
+                    <span class="pz-bar-value">${fmtCompact(branch.sales)}<small class="pz-tone ${achievementTone(achievement)}">${fmtPct(achievement)}</small></span>
+                </div>`;
+        }).join("");
+
+        const percentBars = (valueOf, toneOf) => {
+            const values = branches.map(valueOf);
+            const max = Math.max(100, ...values.filter(value => value != null));
+
+            return branches.map((branch, index) => {
+                const value = values[index];
+
+                return `
+                    <div class="pz-bar-row is-thin">
+                        <span class="pz-bar-label">${esc(branch.name)}</span>
+                        <div class="pz-bar-track">
+                            <i class="pz-bar ${toneOf ? toneOf(value) : ""}" style="width:${width(value || 0, max)}%"></i>
+                        </div>
+                        <span class="pz-bar-value">${fmtPct(value)}</span>
+                    </div>`;
+            }).join("");
+        };
+
+        const empty = `<p class="pz-empty">${esc(tx("none"))}</p>`;
+
+        return {
+            title: tx("chartsTitle"),
+            subtitle: tx("chartsSub"),
+            body: `
+                <div class="pz-grid-2 is-even">
+                    <div class="pz-panel">
+                        <h3 class="pz-h3">${esc(tx("chartSalesTarget"))}</h3>
+                        <div class="pz-legend">
+                            <span><i class="pz-swatch is-sales"></i>${esc(tx("sales"))}</span>
+                            <span><i class="pz-swatch is-target"></i>${esc(tx("chartTargetMark"))}</span>
+                        </div>
+                        <div class="pz-bars">${branches.length ? salesBars : empty}</div>
+                    </div>
+                    <div class="pz-col">
+                        <div class="pz-panel">
+                            <h3 class="pz-h3">${esc(tx("chartOverdue"))}</h3>
+                            <div class="pz-bars">${branches.length ? percentBars(branch => ratio(branch.overdue, branch.outstanding), overdueTone) : empty}</div>
+                        </div>
+                        <div class="pz-panel">
+                            <h3 class="pz-h3">${esc(tx("chartCollection"))}</h3>
+                            <div class="pz-bars">${branches.length ? percentBars(branch => ratio(branch.collections, branch.sales)) : empty}</div>
+                        </div>
+                    </div>
+                </div>`
+        };
+    }
+
+    function salesmenSlides(model) {
+        const ranked = [
+            ...model.salesmen
+                .filter(salesman => salesman.target > 0)
+                .sort((a, b) => ratio(b.sales, b.target) - ratio(a.sales, a.target)),
+            ...model.salesmen
+                .filter(salesman => !(salesman.target > 0))
+                .sort((a, b) => b.sales - a.sales)
+        ];
+
+        const groups = chunk(ranked, 15);
+
+        return groups.map((group, groupIndex) => ({
+            title:
+                tx("salesmenTitle") +
+                (groups.length > 1 ? " " + tx("continued", { n: groupIndex + 1, total: groups.length }) : ""),
+            subtitle: tx("salesmenSub"),
+            body: `
+                <table class="pz-table">
+                    <thead>
+                        <tr>
+                            <th class="n">#</th>
+                            <th>${esc(tx("salesman"))}</th>
+                            <th>${esc(tx("branch"))}</th>
+                            <th class="n">${esc(tx("sales"))}</th>
+                            <th class="n">${esc(tx("target"))}</th>
+                            <th>${esc(tx("achievement"))}</th>
+                            <th class="n">${esc(tx("collections"))}</th>
+                            <th class="n">${esc(tx("outstanding"))}</th>
+                            <th class="n">${esc(tx("overdue"))}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${group.length ? group.map((salesman, index) => `
+                            <tr>
+                                <td class="n pz-muted">${groupIndex * 15 + index + 1}</td>
+                                <td class="pz-strong" style="--clip:260px">${clip(salesman.name)}</td>
+                                <td>${esc(salesman.branch)}</td>
+                                <td class="n">${fmtInt(salesman.sales)}</td>
+                                <td class="n">${salesman.target > 0 ? fmtInt(salesman.target) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
+                                <td>${meter(ratio(salesman.sales, salesman.target))}</td>
+                                <td class="n">${fmtInt(salesman.collections)}</td>
+                                <td class="n">${fmtInt(salesman.outstanding)}</td>
+                                <td class="n">${fmtInt(salesman.overdue)}</td>
+                            </tr>`).join("") : emptyRow(9)}
+                    </tbody>
+                </table>`
+        }));
+    }
+
+    function branchSlide(model, branch, rank) {
+        const achievement = ratio(branch.sales, branch.target);
+        const overdueShare = ratio(branch.overdue, branch.outstanding);
+
+        const salesmen = model.salesmen
+            .filter(salesman => salesman.branch === branch.name)
+            .sort((a, b) => b.sales - a.sales || b.target - a.target)
+            .slice(0, 7);
+
+        const customers = topEntries(branch.customerSales, 5);
+        const products = topEntries(branch.productSales, 5);
+        const overdueCustomers = topEntries(branch.overdueCustomers, 5);
+
+        return {
+            title: branch.name,
+            subtitle:
+                tx("branchRank", { rank, total: model.branches.length }) +
+                (language() === "ar" ? "، " : ", ") +
+                tx("branchCustomers", { new: fmtInt(branch.newCustomers), re: fmtInt(branch.reactivated) }),
+            body: `
+                <div class="pz-kpis is-compact" style="--cols:6">
+                    ${kpi(tx("sales"), fmtCompact(branch.sales), "SAR " + fmtInt(branch.sales))}
+                    ${kpi(tx("target"), branch.target > 0 ? fmtCompact(branch.target) : "—", branch.target > 0 ? "SAR " + fmtInt(branch.target) : "")}
+                    ${kpi(tx("achievement"), fmtPct(achievement), targetGap(branch.sales, branch.target, fmtCompact), achievementTone(achievement))}
+                    ${kpi(tx("collections"), fmtCompact(branch.collections), tx("collectionRate") + " " + fmtPct(ratio(branch.collections, branch.sales)))}
+                    ${kpi(tx("outstanding"), fmtCompact(branch.outstanding), tx("notDueValue", { value: fmtCompact(branch.due) }))}
+                    ${kpi(tx("overdue"), fmtCompact(branch.overdue), tx("overdueShare") + " " + fmtPct(overdueShare), overdueTone(overdueShare))}
+                </div>
+                <div class="pz-grid-2">
+                    <div class="pz-col">
+                        <div>
+                            <h3 class="pz-h3">${esc(tx("branchSalesmen"))}</h3>
+                            <table class="pz-table is-medium">
+                                <thead>
+                                    <tr>
+                                        <th>${esc(tx("salesman"))}</th>
+                                        <th class="n">${esc(tx("sales"))}</th>
+                                        <th>${esc(tx("achievement"))}</th>
+                                        <th class="n">${esc(tx("collections"))}</th>
+                                        <th class="n">${esc(tx("overdue"))}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${salesmen.length ? salesmen.map(salesman => `
+                                        <tr>
+                                            <td class="pz-strong" style="--clip:170px">${clip(salesman.name)}</td>
+                                            <td class="n">${fmtInt(salesman.sales)}</td>
+                                            <td>${salesman.target > 0 ? meter(ratio(salesman.sales, salesman.target)) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
+                                            <td class="n">${fmtInt(salesman.collections)}</td>
+                                            <td class="n">${fmtInt(salesman.overdue)}</td>
+                                        </tr>`).join("") : emptyRow(5)}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h3 class="pz-h3">${esc(tx("topProducts"))}</h3>
+                            <table class="pz-table is-medium">
+                                <thead>
+                                    <tr>
+                                        <th>${esc(tx("product"))}</th>
+                                        <th class="n">${esc(tx("qty"))}</th>
+                                        <th class="n">${esc(tx("value"))}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${products.length ? products.map(product => `
+                                        <tr>
+                                            <td style="--clip:360px">${clip(product.label)}</td>
+                                            <td class="n">${fmtInt(product.quantity)}</td>
+                                            <td class="n">${fmtInt(product.amount)}</td>
+                                        </tr>`).join("") : emptyRow(3)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="pz-col">
+                        <div>
+                            <h3 class="pz-h3">${esc(tx("topCustomers"))}</h3>
+                            <table class="pz-table is-medium">
+                                <thead>
+                                    <tr>
+                                        <th>${esc(tx("customer"))}</th>
+                                        <th class="n">${esc(tx("value"))}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${customers.length ? customers.map(customer => `
+                                        <tr>
+                                            <td style="--clip:290px">${clip(customer.label)}</td>
+                                            <td class="n">${fmtInt(customer.amount)}</td>
+                                        </tr>`).join("") : emptyRow(2)}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h3 class="pz-h3">${esc(tx("topOverdue"))}</h3>
+                            <table class="pz-table is-medium">
+                                <thead>
+                                    <tr>
+                                        <th>${esc(tx("customer"))}</th>
+                                        <th class="n">${esc(tx("balance"))}</th>
+                                        <th class="n">${esc(tx("days"))}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${overdueCustomers.length ? overdueCustomers.map(customer => `
+                                        <tr>
+                                            <td style="--clip:220px">${clip(customer.label)}</td>
+                                            <td class="n pz-tone is-bad">${fmtInt(customer.amount)}</td>
+                                            <td class="n">${fmtInt(customer.days)}</td>
+                                        </tr>`).join("") : emptyRow(3)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`
+        };
+    }
+
+    function agingSlide(model) {
+        const bucketLabels = [
+            tx("notDue"),
+            tx("bucket1"),
+            tx("bucket2"),
+            tx("bucket3"),
+            tx("bucket4"),
+            tx("bucket5")
+        ];
+
+        const maxOverdueCell = Math.max(
+            1,
+            ...model.branches.flatMap(branch => branch.aging.slice(1))
+        );
+
+        const cells = (aging, heat) =>
+            aging.map((value, index) => {
+                if (!heat || index === 0 || value <= 0) {
+                    return `<td class="n">${value ? fmtInt(value) : "—"}</td>`;
+                }
+
+                const alpha = 0.08 + 0.42 * Math.min(1, value / maxOverdueCell);
+                return `<td class="n" style="background:rgba(192,57,43,${alpha.toFixed(3)})">${fmtInt(value)}</td>`;
+            }).join("");
+
+        const priorities = topEntries(model.company.overdueCustomers, 10);
+
+        return {
+            title: tx("agingTitle"),
+            subtitle: tx("agingSub"),
+            body: `
+                <table class="pz-table">
+                    <thead>
+                        <tr>
+                            <th>${esc(tx("branch"))}</th>
+                            ${bucketLabels.map(label => `<th class="n">${esc(label)}</th>`).join("")}
+                            <th class="n">${esc(tx("outstanding"))}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${model.branches.length ? model.branches.map(branch => `
+                            <tr>
+                                <td class="pz-strong">${esc(branch.name)}</td>
+                                ${cells(branch.aging, true)}
+                                <td class="n pz-strong">${fmtInt(branch.outstanding)}</td>
+                            </tr>`).join("") : emptyRow(8)}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>${esc(tx("total"))}</td>
+                            ${cells(model.company.aging, false)}
+                            <td class="n">${fmtInt(model.company.outstanding)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <div>
+                    <h3 class="pz-h3">${esc(tx("priorityTitle"))}</h3>
+                    <table class="pz-table is-small">
+                        <thead>
+                            <tr>
+                                <th class="n">#</th>
+                                <th>${esc(tx("customer"))}</th>
+                                <th>${esc(tx("branch"))}</th>
+                                <th>${esc(tx("salesman"))}</th>
+                                <th class="n">${esc(tx("balance"))}</th>
+                                <th class="n">${esc(tx("days"))}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${priorities.length ? priorities.map((customer, index) => `
+                                <tr>
+                                    <td class="n pz-muted">${index + 1}</td>
+                                    <td class="pz-strong" style="--clip:360px">${clip(customer.label)}</td>
+                                    <td>${esc(customer.branch)}</td>
+                                    <td style="--clip:200px">${clip(customer.salesman)}</td>
+                                    <td class="n pz-tone is-bad">${fmtInt(customer.amount)}</td>
+                                    <td class="n">${fmtInt(customer.days)}</td>
+                                </tr>`).join("") : emptyRow(6)}
+                        </tbody>
+                    </table>
+                </div>`
+        };
+    }
+
+    /* =====================================================
+       Document
+    ===================================================== */
+
+    const DECK_CSS = `
+@page { size: A4 landscape; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #e6ecf0; }
+body {
+    font-family: "Cairo", "Inter", "Segoe UI", Tahoma, sans-serif;
+    color: #0c2e42;
+    padding: 16px 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+html[lang="en"] body { font-family: "Inter", "Cairo", "Segoe UI", sans-serif; }
+
+.pz-frame {
+    position: relative;
+    width: calc(${SLIDE_WIDTH}px * var(--s, 1));
+    height: calc(${SLIDE_HEIGHT}px * var(--s, 1));
+    margin: 0 auto 18px;
+}
+.pz-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: ${SLIDE_WIDTH}px;
+    height: ${SLIDE_HEIGHT}px;
+    transform: scale(var(--s, 1));
+    transform-origin: 0 0;
+    background: #ffffff;
+    box-shadow: 0 6px 22px rgba(12, 46, 66, 0.14);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 44px 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Header and footer */
+.pz-head {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #0c2e42;
+}
+.pz-logo { height: 42px; width: auto; }
+.pz-head h2 { font-size: 27px; font-weight: 800; line-height: 1.2; }
+.pz-head p { font-size: 13.5px; color: #5b6b78; margin-top: 2px; }
+.pz-head-meta {
+    margin-inline-start: auto;
+    text-align: end;
+    font-size: 12px;
+    color: #5b6b78;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+}
+.pz-head-meta strong { color: #0c2e42; font-size: 13px; }
+.pz-body {
+    flex: 1;
+    min-height: 0;
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.pz-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 11px;
+    color: #8595a2;
+    border-top: 1px solid #dfe6ec;
+    padding-top: 8px;
+    margin-top: 10px;
+}
+
+/* Cover */
+.pz-cover { flex-direction: row; padding: 0; }
+.pz-cover-main {
+    flex: 0 0 62%;
+    background: #0c2e42;
+    color: #ffffff;
+    padding: 64px 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 14px;
+}
+.pz-cover-rule { display: block; width: 72px; height: 6px; background: #1c95b8; }
+.pz-cover h1 { font-size: 58px; font-weight: 800; line-height: 1.12; }
+.pz-cover-sub { font-size: 20px; color: #b9d3df; max-width: 520px; line-height: 1.5; }
+.pz-cover-facts {
+    display: flex;
+    gap: 44px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+.pz-cover-facts > div:first-child { flex: 1; min-width: 0; }
+.pz-cover-facts > div:last-child dd { white-space: nowrap; }
+.pz-cover-facts dt { font-size: 13px; color: #8fb3c4; }
+.pz-cover-facts dd { font-size: 18px; font-weight: 700; margin-top: 2px; }
+.pz-cover-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 64px 44px;
+}
+.pz-cover-logo { max-width: 270px; max-height: 230px; margin-top: 90px; }
+.pz-cover-name { margin-top: 120px; font-size: 30px; font-weight: 800; }
+.pz-cover-meta { align-self: stretch; display: grid; gap: 14px; }
+.pz-cover-meta div { border-top: 1px solid #dfe6ec; padding-top: 10px; }
+.pz-cover-meta dt { font-size: 12.5px; color: #5b6b78; }
+.pz-cover-meta dd { font-size: 16px; font-weight: 700; }
+
+/* KPI tiles */
+.pz-kpis { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 12px; }
+.pz-kpi {
+    border: 1px solid #dfe6ec;
+    border-top: 4px solid #1c95b8;
+    padding: 13px 16px 12px;
+    min-width: 0;
+}
+.pz-kpi span { display: block; font-size: 13px; color: #5b6b78; }
+.pz-kpi strong { display: block; font-size: 30px; font-weight: 800; line-height: 1.25; font-family: "Inter", "Cairo", sans-serif; }
+.pz-kpi small { display: block; font-size: 11.5px; color: #5b6b78; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pz-kpis.is-compact .pz-kpi { padding: 10px 12px; }
+.pz-kpis.is-compact .pz-kpi strong { font-size: 23px; }
+.pz-kpis.is-compact .pz-kpi span { font-size: 12px; }
+.pz-kpi.is-good { border-top-color: #1f8a5b; }
+.pz-kpi.is-good strong { color: #1f8a5b; }
+.pz-kpi.is-warn { border-top-color: #c98a12; }
+.pz-kpi.is-warn strong { color: #a8700a; }
+.pz-kpi.is-bad { border-top-color: #c0392b; }
+.pz-kpi.is-bad strong { color: #c0392b; }
+
+/* Panels and layout */
+.pz-split { display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; flex: 1; min-height: 0; }
+.pz-grid-2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; flex: 1; min-height: 0; }
+.pz-grid-2.is-even { grid-template-columns: 1fr 1fr; }
+.pz-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.pz-panel {
+    border: 1px solid #dfe6ec;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    flex: 1;
+}
+.pz-h3 {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.3;
+    padding-inline-start: 10px;
+    border-inline-start: 4px solid #1c95b8;
+    margin-bottom: 8px;
+}
+.pz-panel .pz-h3 { margin-bottom: 0; }
+.pz-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+.pz-stat span { display: block; font-size: 12.5px; color: #5b6b78; }
+.pz-stat strong { font-size: 24px; font-weight: 800; font-family: "Inter", "Cairo", sans-serif; }
+.pz-list { list-style: none; display: grid; gap: 10px; font-size: 15px; line-height: 1.55; }
+.pz-list li { position: relative; padding-inline-start: 18px; }
+.pz-list li::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0.62em;
+    width: 8px;
+    height: 8px;
+    background: #1c95b8;
+}
+
+/* Tables */
+.pz-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pz-table th {
+    background: #0c2e42;
+    color: #ffffff;
+    font-weight: 700;
+    padding: 8px 9px;
+    text-align: start;
+    white-space: nowrap;
+}
+.pz-table td { padding: 7px 9px; border-bottom: 1px solid #e6ecf1; white-space: nowrap; }
+.pz-table tbody tr:nth-child(even) td { background-color: #f5f8fa; }
+.pz-table .n { text-align: end; }
+.pz-table tfoot td { font-weight: 800; background: #e8f1f5; border-top: 2px solid #0c2e42; border-bottom: none; }
+.pz-table.pz-table-large { font-size: 13.5px; }
+.pz-table.pz-table-large th { white-space: normal; line-height: 1.3; vertical-align: bottom; padding: 8px 7px; }
+.pz-table.pz-table-large td { padding: 12px 7px; }
+.pz-table.pz-table-large .pz-meter { min-width: 104px; }
+.pz-table.is-medium { font-size: 13px; }
+.pz-table.is-medium td { padding: 7px 9px; }
+.pz-table.is-small { font-size: 12px; }
+.pz-table.is-small th { padding: 6px 8px; }
+.pz-table.is-small td { padding: 5px 8px; }
+.pz-empty-cell { text-align: center; color: #8595a2; padding: 14px 8px; }
+.pz-clip { display: block; max-width: var(--clip, 240px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz-strong { font-weight: 700; }
+.pz-muted { color: #8595a2; }
+.pz-empty { color: #8595a2; font-size: 13px; }
+.pz-tone.is-good { color: #1f8a5b; }
+.pz-tone.is-warn { color: #a8700a; }
+.pz-tone.is-bad { color: #c0392b; }
+.pz-tone.is-none { color: #8595a2; }
+
+/* Achievement meter */
+.pz-meter { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+.pz-meter-track { position: relative; flex: 1; height: 8px; background: #e3eaef; overflow: hidden; }
+.pz-meter-track i { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; background: #9aabb7; }
+.pz-meter b { font-size: 12px; font-weight: 800; min-width: 48px; text-align: end; }
+.pz-meter.is-good i { background: #1f8a5b; }
+.pz-meter.is-good b { color: #1f8a5b; }
+.pz-meter.is-warn i { background: #c98a12; }
+.pz-meter.is-warn b { color: #a8700a; }
+.pz-meter.is-bad i { background: #c0392b; }
+.pz-meter.is-bad b { color: #c0392b; }
+.pz-meter.is-none b { color: #8595a2; }
+
+/* Bar charts */
+.pz-legend { display: flex; gap: 20px; font-size: 12px; color: #5b6b78; }
+.pz-swatch { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-inline-end: 6px; }
+.pz-swatch.is-sales { background: #1c95b8; }
+.pz-swatch.is-target { width: 3px; height: 14px; background: #0c2e42; }
+.pz-bars { display: grid; gap: 14px; }
+.pz-bar-row { display: grid; grid-template-columns: 104px 1fr 92px; align-items: center; gap: 12px; font-size: 13px; }
+.pz-bar-row.is-thin { gap: 10px; }
+.pz-bar-label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pz-bar-track { position: relative; height: 26px; background: #eef3f6; }
+.pz-bar-row.is-thin .pz-bar-track { height: 16px; }
+.pz-bar { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; background: #1c95b8; }
+.pz-bar.is-good { background: #1f8a5b; }
+.pz-bar.is-warn { background: #c98a12; }
+.pz-bar.is-bad { background: #c0392b; }
+.pz-bar-target { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-inline-start: -1px; background: #0c2e42; }
+.pz-bar-value { font-weight: 800; text-align: end; font-family: "Inter", "Cairo", sans-serif; }
+.pz-bar-value small { display: block; font-size: 11.5px; font-weight: 700; }
+
+/* Full screen presenting */
+.pz-controls { display: none; }
+body.pz-present { background: #071a29; padding: 0; height: 100vh; overflow: hidden; }
+body.pz-present .pz-frame {
+    display: none;
+    position: absolute;
+    top: calc(50% - 22px);
+    left: 50%;
+    margin: 0;
+    transform: translate(-50%, -50%);
+}
+body.pz-present .pz-frame.is-current { display: block; }
+body.pz-present .pz-slide { box-shadow: none; }
+body.pz-present .pz-controls {
+    display: flex;
+    position: fixed;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    gap: 8px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 5px 8px;
+    border-radius: 999px;
+}
+.pz-controls button {
+    font: inherit;
+    font-size: 13px;
+    color: #ffffff;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    padding: 5px 16px;
+    cursor: pointer;
+}
+.pz-controls button:hover { background: rgba(255, 255, 255, 0.12); }
+.pz-controls button:focus-visible { outline: 2px solid #1c95b8; outline-offset: 2px; }
+.pz-controls span { color: #cfe0e8; font-size: 13px; min-width: 64px; text-align: center; }
+
+/* Print */
+@media print {
+    html, body { background: #ffffff; padding: 0; height: auto; overflow: visible; }
+    .pz-controls { display: none !important; }
+    .pz-frame,
+    body.pz-present .pz-frame {
+        display: block !important;
+        position: relative;
+        top: auto;
+        left: auto;
+        transform: none;
+        width: ${SLIDE_WIDTH}px;
+        height: ${SLIDE_HEIGHT}px;
+        margin: 0;
+        overflow: hidden;
+        break-after: page;
+        page-break-after: always;
+    }
+    .pz-frame:last-child { break-after: auto; page-break-after: auto; }
+    .pz-slide { transform: none; box-shadow: none; }
+}
+`;
+
+    function buildDocument(model) {
+        const lang = language();
+        const dir = lang === "ar" ? "rtl" : "ltr";
+        const period = model.period;
+
+        const periodLabel =
+            (period.derived ? tx("periodAll") + ": " : "") +
+            tx("periodFromTo", { from: fmtDate(period.from), to: fmtDate(period.to) });
+
+        const scopeLabel = model.scopeBranch
+            ? tx("scopeBranch", { branch: model.scopeBranch })
+            : tx("scopeAll");
+
+        const context = {
+            logo: getLogo(),
+            periodLabel,
+            scopeLabel,
+            user: clean(auth?.getUser?.()?.username)
+        };
+
+        const slides = [
+            { cover: true },
+            overviewSlide(model),
+            comparisonSlide(model),
+            chartsSlide(model),
+            ...salesmenSlides(model),
+            ...model.branches.map((branch, index) => branchSlide(model, branch, index + 1)),
+            agingSlide(model)
+        ];
+
+        const total = slides.length;
+
+        const html = slides.map((slide, index) => {
+            const number = index + 1;
+
+            if (slide.cover) {
+                return `<section class="pz-frame" data-index="${index}">${coverSlide(context)}</section>`;
+            }
+
+            return `
+                <section class="pz-frame" data-index="${index}">
+                    <div class="pz-slide">
+                        <header class="pz-head">
+                            ${context.logo ? `<img class="pz-logo" src="${esc(context.logo)}" alt="">` : ""}
+                            <div>
+                                <h2>${esc(slide.title)}</h2>
+                                ${slide.subtitle ? `<p>${esc(slide.subtitle)}</p>` : ""}
+                            </div>
+                            <div class="pz-head-meta">
+                                <strong>${esc(context.scopeLabel)}</strong>
+                                <span>${esc(context.periodLabel)}</span>
+                            </div>
+                        </header>
+                        <div class="pz-body">${slide.body}</div>
+                        <footer class="pz-foot">
+                            <span>Al-Howail Tyres</span>
+                            <span>${esc(tx("currencyNote"))}</span>
+                            <span>${esc(tx("page", { n: number, total }))}</span>
+                        </footer>
+                    </div>
+                </section>`;
+        }).join("");
+
+        state.slideCount = total;
+
+        return `<!DOCTYPE html>
+<html lang="${lang}" dir="${dir}">
+<head>
+<meta charset="UTF-8">
+<title>${esc(tx("deckTitle"))}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>${DECK_CSS}</style>
+</head>
+<body>
+<main class="pz-deck">${html}</main>
+<nav class="pz-controls" aria-label="Slides">
+<button type="button" data-pz="prev">${esc(tx("prev"))}</button>
+<span data-pz="counter"></span>
+<button type="button" data-pz="next">${esc(tx("next"))}</button>
+<button type="button" data-pz="exit">${esc(tx("exit"))}</button>
+</nav>
+</body>
+</html>`;
+    }
+
+    /* =====================================================
+       Frame layout, presenting and printing
+    ===================================================== */
+
+    function getFrame() {
+        return utils.byId("presentationFrame");
+    }
+
+    function getDeckDocument() {
+        try {
+            return getFrame()?.contentDocument || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function layoutFrame() {
+        const frame = getFrame();
+        const doc = getDeckDocument();
+
+        if (!frame || !doc?.body || !frame.clientWidth) {
+            return;
+        }
+
+        if (state.presenting) {
+            applyPresentScale();
+            return;
+        }
+
+        const scale = Math.max(0.2, Math.min(1.1, (frame.clientWidth - 32) / SLIDE_WIDTH));
+        doc.documentElement.style.setProperty("--s", scale.toFixed(4));
+
+        const deck = doc.querySelector(".pz-deck");
+        const height = (deck ? deck.offsetHeight : doc.body.scrollHeight) + 40;
+        frame.style.height = Math.ceil(height) + "px";
+    }
+
+    function applyPresentScale() {
+        const frame = getFrame();
+        const doc = getDeckDocument();
+        const view = frame?.contentWindow;
+
+        if (!doc || !view) {
+            return;
+        }
+
+        const scale = Math.min(
+            view.innerWidth / SLIDE_WIDTH,
+            (view.innerHeight - 52) / SLIDE_HEIGHT
+        );
+
+        doc.documentElement.style.setProperty("--s", Math.max(0.2, scale).toFixed(4));
+    }
+
+    function showSlide(index) {
+        const doc = getDeckDocument();
+
+        if (!doc) {
+            return;
+        }
+
+        const frames = [...doc.querySelectorAll(".pz-frame")];
+
+        if (!frames.length) {
+            return;
+        }
+
+        state.currentSlide = Math.max(0, Math.min(frames.length - 1, index));
+
+        frames.forEach((element, position) => {
+            element.classList.toggle("is-current", position === state.currentSlide);
+        });
+
+        const counter = doc.querySelector('[data-pz="counter"]');
+
+        if (counter) {
+            counter.textContent = `${state.currentSlide + 1} / ${frames.length}`;
+        }
+
+        applyPresentScale();
+    }
+
+    function exitFullscreen() {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+
+        if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) {
+            exit.call(document);
+        }
+    }
+
+    function handleFullscreenChange() {
+        const frame = getFrame();
+        const doc = getDeckDocument();
+        const active = document.fullscreenElement || document.webkitFullscreenElement;
+
+        if (!frame || !doc?.body) {
+            return;
+        }
+
+        if (active === frame) {
+            state.presenting = true;
+            doc.body.classList.add("pz-present");
+            showSlide(state.currentSlide);
+            frame.contentWindow?.focus();
+            return;
+        }
+
+        if (state.presenting) {
+            state.presenting = false;
+            doc.body.classList.remove("pz-present");
+            doc.querySelectorAll(".pz-frame.is-current").forEach(element =>
+                element.classList.remove("is-current")
+            );
+            layoutFrame();
+        }
+    }
+
+    function bindDeckEvents() {
+        const frame = getFrame();
+        const doc = getDeckDocument();
+
+        if (!doc) {
+            return;
+        }
+
+        doc.addEventListener("click", event => {
+            const control = event.target.closest?.("[data-pz]");
+
+            if (control) {
+                const action = control.dataset.pz;
+
+                if (action === "prev") showSlide(state.currentSlide - 1);
+                if (action === "next") showSlide(state.currentSlide + 1);
+                if (action === "exit") exitFullscreen();
+                return;
+            }
+
+            if (state.presenting && event.target.closest?.(".pz-frame")) {
+                showSlide(state.currentSlide + 1);
+            }
+        });
+
+        doc.addEventListener("keydown", event => {
+            if (!state.presenting) {
+                return;
+            }
+
+            const rtl = doc.documentElement.dir === "rtl";
+            const key = event.key;
+
+            const forward =
+                ["ArrowDown", "PageDown", " ", "Enter"].includes(key) ||
+                (key === "ArrowLeft" && rtl) ||
+                (key === "ArrowRight" && !rtl);
+
+            const backward =
+                ["ArrowUp", "PageUp", "Backspace"].includes(key) ||
+                (key === "ArrowRight" && rtl) ||
+                (key === "ArrowLeft" && !rtl);
+
+            if (forward) {
+                event.preventDefault();
+                showSlide(state.currentSlide + 1);
+            } else if (backward) {
+                event.preventDefault();
+                showSlide(state.currentSlide - 1);
+            } else if (key === "Home") {
+                event.preventDefault();
+                showSlide(0);
+            } else if (key === "End") {
+                event.preventDefault();
+                showSlide(state.slideCount - 1);
+            }
+        });
+
+        frame?.contentWindow?.addEventListener("resize", () => {
+            if (state.presenting) {
+                applyPresentScale();
+            }
+        });
+
+        const fonts = doc.fonts;
+
+        if (fonts?.ready) {
+            fonts.ready.then(layoutFrame).catch(() => {});
+        }
+
+        layoutFrame();
+    }
+
+    function present() {
+        const frame = getFrame();
+
+        if (!frame || !state.slideCount || !getDeckDocument()?.body) {
+            utils.showToast(tx("emptyDeck"), "warning");
+            return;
+        }
+
+        const request = frame.requestFullscreen || frame.webkitRequestFullscreen;
+
+        if (!request) {
+            utils.showToast(tx("fullscreenUnsupported"), "warning");
+            return;
+        }
+
+        state.currentSlide = 0;
+
+        try {
+            const result = request.call(frame);
+
+            if (result?.catch) {
+                result.catch(() => utils.showToast(tx("fullscreenUnsupported"), "warning"));
+            }
+        } catch (error) {
+            utils.showToast(tx("fullscreenUnsupported"), "warning");
+        }
+    }
+
+    function printDeck() {
+        const frame = getFrame();
+        const view = frame?.contentWindow;
+        const doc = getDeckDocument();
+
+        if (!view || !doc?.body || !state.slideCount) {
+            utils.showToast(tx("emptyDeck"), "warning");
+            return;
+        }
+
+        const run = () => {
+            try {
+                view.focus();
+                view.print();
+            } catch (error) {
+                console.error(error);
+                utils.showToast(tx("printFailed"), "error");
+            }
+        };
+
+        const ready = doc.fonts?.ready;
+
+        if (ready) {
+            ready.then(run).catch(run);
+        } else {
+            run();
+        }
+    }
+
+    /* =====================================================
+       Rendering
+    ===================================================== */
+
+    function isVisible() {
+        return Boolean(utils.byId("presentationPage")?.classList.contains("active"));
+    }
+
+    function render(force = false) {
+        const frame = getFrame();
+        const empty = utils.byId("presentationEmpty");
+        const stage = utils.byId("presentationStage");
+        const info = utils.byId("presentationInfo");
+
+        if (!frame || !empty || !stage) {
+            return;
+        }
+
+        const hasData = Boolean(
+            state.data &&
+            (
+                (state.data.invoices || []).length ||
+                (state.data.target || []).length ||
+                (state.balanceRows || []).length
+            )
+        );
+
+        empty.style.display = hasData ? "none" : "";
+        stage.style.display = hasData ? "" : "none";
+
+        if (!hasData) {
+            if (info) info.textContent = "";
+            return;
+        }
+
+        if (!force && !isVisible()) {
+            state.dirty = true;
+            return;
+        }
+
+        const html = buildDocument(buildModel());
+        state.dirty = false;
+
+        if (info) {
+            info.textContent = tx("slides", { count: state.slideCount });
+        }
+
+        if (html === state.lastHTML) {
+            layoutFrame();
+            return;
+        }
+
+        state.lastHTML = html;
+        frame.srcdoc = html;
+    }
+
+    function setData(data, balanceRows) {
+        state.data = data || null;
+        state.balanceRows = Array.isArray(balanceRows)
+            ? balanceRows
+            : (data?.dueOverdue || []);
+        state.dirty = true;
+        render();
+    }
+
+    function refresh() {
+        render();
+    }
+
+    function initialize() {
+        if (state.initialized) {
+            return;
+        }
+
+        state.initialized = true;
+
+        const frame = getFrame();
+
+        frame?.addEventListener("load", bindDeckEvents);
+
+        utils.byId("presentationPrintButton")?.addEventListener("click", printDeck);
+        utils.byId("presentationPresentButton")?.addEventListener("click", present);
+
+        document.addEventListener("fullscreenchange", handleFullscreenChange);
+        document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+        let resizeTimer = 0;
+
+        window.addEventListener("resize", () => {
+            window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(() => {
+                if (isVisible()) layoutFrame();
+            }, 150);
+        });
+    }
+
+    return Object.freeze({
+        initialize,
+        setData,
+        render,
+        refresh,
+        print: printDeck,
+        present
+    });
+})();
+
+</script>
+<script>
 /* ===== app.js ===== */
 "use strict";
 
@@ -28843,6 +30940,17 @@ window.DashboardApp = (() => {
             data
         );
 
+        /*
+         * العرض التقديمي للإدارة: المبيعات والتحصيل حسب الفترة،
+         * والمديونية بالرصيد الحالي (نفس منطق ملفات المندوبين).
+         */
+        callModule(
+            window.DashboardPresentation,
+            "setData",
+            data,
+            profileDueOverdue
+        );
+
         updateLastUpdate(
             data.updatedAt
         );
@@ -28902,6 +31010,11 @@ window.DashboardApp = (() => {
             window.DashboardAlerts,
             "refresh"
         );
+
+        callModule(
+            window.DashboardPresentation,
+            "refresh"
+        );
     }
 
 
@@ -28952,6 +31065,11 @@ window.DashboardApp = (() => {
 
         callModule(
             window.DashboardAlerts,
+            "initialize"
+        );
+
+        callModule(
+            window.DashboardPresentation,
             "initialize"
         );
     }
@@ -29347,6 +31465,14 @@ window.DashboardApp = (() => {
     ===================================================== */
 
     const pageTranslations = {
+        presentation: {
+            title:
+                "presentation.title",
+
+            subtitle:
+                "presentation.subtitle"
+        },
+
         dashboard: {
             title:
                 "navigation.dashboard",
@@ -29482,7 +31608,8 @@ window.DashboardApp = (() => {
             !currentUser.isManagement &&
             [
                 "salesmanProfiles",
-                "salesIntelligence"
+                "salesIntelligence",
+                "presentation"
             ].includes(selectedPage)
         ) {
             selectedPage =
@@ -29572,6 +31699,16 @@ window.DashboardApp = (() => {
         ) {
             callModule(
                 window.DashboardAlerts,
+                "refresh"
+            );
+        }
+
+        if (
+            selectedPage ===
+            "presentation"
+        ) {
+            callModule(
+                window.DashboardPresentation,
                 "refresh"
             );
         }
