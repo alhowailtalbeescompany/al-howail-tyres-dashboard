@@ -11682,10 +11682,13 @@ window.DashboardDashboard = (() => {
                     fallback.overdueRatePercent
                 ),
 
+            /*
+             * شيت الفواتير فيه صف لكل منتج، فعدد الصفوف (counts.invoices)
+             * أكبر من عدد الفواتير الفعلي. نعد الفواتير بأرقامها المميزة.
+             */
             invoiceCount:
                 utils.toNumber(
                     serverSummary.invoiceCount ??
-                    data.counts?.invoices ??
                     fallback.invoiceCount
                 ),
 
