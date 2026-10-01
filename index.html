@@ -4373,6 +4373,18 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
 .customer-note-actions .customer-note-delete[hidden] {
     display: none;
 }
+
+body.visits-disabled [data-visits-feature] {
+    display: none !important;
+}
+
+.profile-visits-card {
+    margin-bottom: 20px;
+}
+
+.profile-visits-card .table-total-row td {
+    background: var(--surface-soft);
+}
 </style>
 </head>
 
@@ -6503,7 +6515,42 @@ html[dir="rtl"] .dashboard-tables .content-card .card-header::before {
                                 <strong id="profileReactivatedCustomerCount">0</strong>
                             </article>
 
+                            <article class="profile-kpi-card" data-visits-feature>
+                                <span data-i18n="salesmanProfiles.visits">الزيارات</span>
+                                <strong id="profileVisitsCount">0</strong>
+                            </article>
+
+                            <article class="profile-kpi-card" data-visits-feature>
+                                <span data-i18n="salesmanProfiles.visitConversion">نسبة تحويل الزيارات</span>
+                                <strong id="profileVisitConversion">0%</strong>
+                            </article>
+
                         </div>
+
+                        <article class="content-card profile-visits-card" data-visits-feature>
+                            <div class="card-header page-card-header">
+                                <div>
+                                    <h3 data-i18n="salesmanProfiles.monthlyVisits">الزيارات الشهرية</h3>
+                                    <p data-i18n="salesmanProfiles.monthlyVisitsSubtitle">
+                                        عدد الزيارات والفواتير ونسبة التحويل (الفواتير ÷ الزيارات) لكل شهر
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="salesmanProfiles.month">الشهر</th>
+                                            <th data-i18n="salesmanProfiles.visits">الزيارات</th>
+                                            <th data-i18n="salesmanProfiles.invoicesCount">الفواتير</th>
+                                            <th data-i18n="salesmanProfiles.visitConversion">نسبة تحويل الزيارات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="profileVisitsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </article>
 
                         <div class="salesman-report-grid">
                             <article class="content-card">
@@ -7516,6 +7563,12 @@ const TRANSLATIONS = {
             customerCount: "عدد العملاء",
             purchasingCustomerCount: "عدد العملاء اللي اشتروا",
             purchasingCustomerPercentage: "نسبة العملاء اللي اشتروا",
+            visits: "الزيارات",
+            visitConversion: "نسبة تحويل الزيارات",
+            monthlyVisits: "الزيارات الشهرية",
+            monthlyVisitsSubtitle: "عدد الزيارات والفواتير ونسبة التحويل (الفواتير ÷ الزيارات) لكل شهر",
+            month: "الشهر",
+            invoicesCount: "الفواتير",
             newCustomers: "العملاء الجدد",
             reactivatedCustomers: "العملاء المعاد تنشيطهم",
             averageInvoice: "متوسط الفاتورة",
@@ -7533,6 +7586,12 @@ const TRANSLATIONS = {
             nextInvoice: "الفاتورة القادمة",
             nextDueDate: "موعد التحصيل",
             customerStatus: "حالة العميل",
+            alertOverdue90: "متأخر أكثر من 90 يومًا",
+            alertOverdue30: "متأخر أكثر من 30 يومًا",
+            alertCreditExceeded: "تجاوز الحد الائتماني",
+            alertLowAchievement: "نسبة تحقيق الهدف أقل من 50%",
+            noAlertsTitle: "لا توجد تنبيهات",
+            noAlerts: "لا توجد تنبيهات لهذا المندوب",
             notes: "ملاحظات",
             addNote: "إضافة",
             editNote: "تعديل",
@@ -7883,6 +7942,12 @@ const TRANSLATIONS = {
             customerCount: "Customer Count",
             purchasingCustomerCount: "Purchasing Customers",
             purchasingCustomerPercentage: "Purchasing %",
+            visits: "Visits",
+            visitConversion: "Visit Conversion",
+            monthlyVisits: "Monthly Visits",
+            monthlyVisitsSubtitle: "Visits, invoices and conversion rate (invoices ÷ visits) per month",
+            month: "Month",
+            invoicesCount: "Invoices",
             newCustomers: "New Customers",
             reactivatedCustomers: "Reactivated Customers",
             averageInvoice: "Average Invoice",
@@ -7900,6 +7965,12 @@ const TRANSLATIONS = {
             nextInvoice: "Next Invoice",
             nextDueDate: "Next Due Date",
             customerStatus: "Customer Status",
+            alertOverdue90: "Overdue more than 90 days",
+            alertOverdue30: "Overdue more than 30 days",
+            alertCreditExceeded: "Credit limit exceeded",
+            alertLowAchievement: "Target achievement below 50%",
+            noAlertsTitle: "No alerts",
+            noAlerts: "No alerts for this salesman",
             notes: "Notes",
             addNote: "Add",
             editNote: "Edit",
@@ -9304,6 +9375,22 @@ window.DashboardAPI = (() => {
                 Array.isArray(response?.upcomingDue)
                     ? response.upcomingDue
                     : [],
+
+            visits: (() => {
+                const visits = Array.isArray(response?.visits)
+                    ? response.visits
+                    : [];
+
+                window.DashboardVisits = visits;
+
+                /* لو مفيش تاب Visits by Month، أجزاء الزيارات تختفي */
+                document.body?.classList.toggle(
+                    "visits-disabled",
+                    !visits.length
+                );
+
+                return visits;
+            })(),
 
             customerNotes: (() => {
                 const notes = Array.isArray(
@@ -19712,6 +19799,24 @@ window.DashboardProfiles = (() => {
                             "متأخر أكثر من 30 يومًا"
                         )} (${utils.formatCurrency(customer.overdue)})`
                     });
+                } else {
+                    /* أي عميل عليه متأخرات يظهر في التنبيهات */
+                    const days = Math.max(
+                        Math.round(utils.toNumber(customer.overdueDays)),
+                        0
+                    );
+                    const isArabic = utils.getLanguage() !== "en";
+
+                    alerts.push({
+                        level: "warning",
+                        icon: "fa-clock",
+                        title: customer.customerName,
+                        text: `${
+                            isArabic
+                                ? `عليه متأخرات${days ? ` منذ ${days} يوم` : ""}`
+                                : `Overdue${days ? ` for ${days} days` : ""}`
+                        } (${utils.formatCurrency(customer.overdue)})`
+                    });
                 }
 
                 if (
@@ -20938,6 +21043,160 @@ window.DashboardProfiles = (() => {
                   );
     }
 
+    /* =====================================================
+       الزيارات ونسبة التحويل (شيت Visits by Month)
+       نسبة التحويل = عدد الفواتير ÷ عدد الزيارات
+    ===================================================== */
+
+    function getVisitPeriodMonths() {
+        const period = targetsModule?.getPeriod?.();
+
+        if (period && Array.isArray(period.months) && period.months.length) {
+            return period.months.map(item =>
+                `${item.year}-${String(item.month).padStart(2, "0")}`
+            );
+        }
+
+        const now = new Date();
+        return [`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`];
+    }
+
+    function buildVisitStats(code) {
+        const visitRows = Array.isArray(window.DashboardVisits)
+            ? window.DashboardVisits
+            : [];
+
+        if (!visitRows.length) {
+            return null;
+        }
+
+        const targetRow = findTargetRowByCode(code) || {};
+        const codes = getTargetCodes(targetRow).length
+            ? getTargetCodes(targetRow)
+            : [normalizeCode(code)];
+
+        const months = getVisitPeriodMonths();
+        const monthSet = new Set(months);
+
+        const visitsByMonth = new Map();
+
+        visitRows
+            .filter(row => rowBelongsToCodes(row, codes))
+            .forEach(row => {
+                const month = String(row.month || "");
+                visitsByMonth.set(
+                    month,
+                    (visitsByMonth.get(month) || 0) + utils.toNumber(row.visits)
+                );
+            });
+
+        const invoicesByMonth = new Map();
+
+        rawInvoiceRows
+            .filter(row => rowBelongsToCodes(row, codes))
+            .forEach(row => {
+                const date = String(
+                    getValue(row, ["invoiceDate", "Invoice Date", "date"], "")
+                ).slice(0, 7);
+                const invoiceNo = normalizeCode(
+                    getValue(row, ["invoiceNo", "invoiceNumber", "Invoice Number"], "")
+                );
+
+                if (!date || !invoiceNo) {
+                    return;
+                }
+
+                if (!invoicesByMonth.has(date)) {
+                    invoicesByMonth.set(date, new Set());
+                }
+
+                invoicesByMonth.get(date).add(invoiceNo);
+            });
+
+        const monthly = months.map(month => {
+            const visits = visitsByMonth.get(month) || 0;
+            const invoices = invoicesByMonth.get(month)?.size || 0;
+
+            return {
+                month,
+                visits,
+                invoices,
+                conversion: visits > 0 ? (invoices / visits) * 100 : null
+            };
+        });
+
+        const totalVisits = monthly.reduce((sum, item) => sum + item.visits, 0);
+        const totalInvoices = monthly.reduce((sum, item) => sum + item.invoices, 0);
+
+        return {
+            monthly: monthly.filter(item => monthSet.has(item.month)),
+            totalVisits,
+            totalInvoices,
+            conversion: totalVisits > 0 ? (totalInvoices / totalVisits) * 100 : null
+        };
+    }
+
+    function formatVisitMonth(month) {
+        const [year, monthNumber] = String(month).split("-").map(Number);
+
+        if (!year || !monthNumber) {
+            return month;
+        }
+
+        return new Intl.DateTimeFormat(
+            utils.getLanguage() === "en" ? "en-GB" : "ar-SA-u-ca-gregory-nu-latn",
+            { month: "long", year: "numeric" }
+        ).format(new Date(year, monthNumber - 1, 1));
+    }
+
+    function formatConversion(value) {
+        return value == null ? "—" : `${value.toFixed(1)}%`;
+    }
+
+    function renderVisits(stats) {
+        utils.setText(
+            "profileVisitsCount",
+            stats ? utils.formatNumber(stats.totalVisits, 0) : "—"
+        );
+
+        utils.setText(
+            "profileVisitConversion",
+            stats ? formatConversion(stats.conversion) : "—"
+        );
+
+        const body = utils.byId("profileVisitsTableBody");
+
+        if (!body) {
+            return;
+        }
+
+        if (!stats || !stats.monthly.length) {
+            body.innerHTML = utils.emptyTableRow(
+                4,
+                utils.t("common.noData", "لا توجد بيانات متاحة")
+            );
+            return;
+        }
+
+        body.innerHTML =
+            stats.monthly.map(item => `
+                <tr>
+                    <td>${utils.escapeHTML(formatVisitMonth(item.month))}</td>
+                    <td>${utils.formatNumber(item.visits, 0)}</td>
+                    <td>${utils.formatNumber(item.invoices, 0)}</td>
+                    <td><strong>${formatConversion(item.conversion)}</strong></td>
+                </tr>
+            `).join("") +
+            `
+                <tr class="table-total-row">
+                    <td><strong>${utils.escapeHTML(utils.t("common.total", "الإجمالي"))}</strong></td>
+                    <td><strong>${utils.formatNumber(stats.totalVisits, 0)}</strong></td>
+                    <td><strong>${utils.formatNumber(stats.totalInvoices, 0)}</strong></td>
+                    <td><strong>${formatConversion(stats.conversion)}</strong></td>
+                </tr>
+            `;
+    }
+
     function render() {
         const code =
             getSelectedSalesmanCode();
@@ -20963,6 +21222,9 @@ window.DashboardProfiles = (() => {
         renderMonthlyComparison(profile.monthly);
         renderTrendChart(profile.trend);
         renderSalesmanAlerts(profile.salesmanAlerts);
+
+        profile.visitStats = buildVisitStats(profile.code || code);
+        renderVisits(profile.visitStats);
 
         return profile;
     }
@@ -21396,6 +21658,17 @@ window.DashboardProfiles = (() => {
                         font-size: 10px;
                     }
 
+                    /* العنوان والرسم في نفس الصفحة */
+                    .trend-block {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                    }
+
+                    .trend-block h2 {
+                        break-after: avoid;
+                        page-break-after: avoid;
+                    }
+
                     .trend-chart-image {
                         display: block;
                         box-sizing: border-box;
@@ -21617,6 +21890,22 @@ window.DashboardProfiles = (() => {
                         Reactivated Customers:
                         ${utils.formatNumber(profile.reactivatedCustomerCount, 0)}
                     </div>
+
+                    ${
+                        profile.visitStats
+                            ? `
+                                <div>
+                                    Visits:
+                                    ${utils.formatNumber(profile.visitStats.totalVisits, 0)}
+                                </div>
+
+                                <div>
+                                    Visit Conversion:
+                                    ${formatConversion(profile.visitStats.conversion)}
+                                </div>
+                            `
+                            : ""
+                    }
                 </div>
 
                 <h2 style="margin:26px 0 10px;font-size:18px;">Monthly Performance Comparison</h2>
@@ -21639,10 +21928,51 @@ window.DashboardProfiles = (() => {
                 </div>
 
                 ${
+                    profile.visitStats && profile.visitStats.monthly.length
+                        ? `
+                            <div class="trend-block">
+                                <h2 style="margin:26px 0 10px;font-size:18px;">Monthly Visits &amp; Conversion</h2>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Month</th>
+                                            <th>Visits</th>
+                                            <th>Invoices</th>
+                                            <th>Conversion (Invoices ÷ Visits)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${profile.visitStats.monthly.map(item => `
+                                            <tr>
+                                                <td>${utils.escapeHTML(
+                                                    new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" })
+                                                        .format(new Date(Number(item.month.slice(0, 4)), Number(item.month.slice(5, 7)) - 1, 1))
+                                                )}</td>
+                                                <td>${utils.formatNumber(item.visits, 0)}</td>
+                                                <td>${utils.formatNumber(item.invoices, 0)}</td>
+                                                <td>${formatConversion(item.conversion)}</td>
+                                            </tr>
+                                        `).join("")}
+                                        <tr>
+                                            <td><strong>Total</strong></td>
+                                            <td><strong>${utils.formatNumber(profile.visitStats.totalVisits, 0)}</strong></td>
+                                            <td><strong>${utils.formatNumber(profile.visitStats.totalInvoices, 0)}</strong></td>
+                                            <td><strong>${formatConversion(profile.visitStats.conversion)}</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        `
+                        : ""
+                }
+
+                ${
                     trendChartImage
                         ? `
-                            <h2 style="margin:26px 0 10px;font-size:18px;">Monthly Sales Trend (Year to Date)</h2>
-                            <img class="trend-chart-image" src="${trendChartImage}">
+                            <div class="trend-block">
+                                <h2 style="margin:26px 0 10px;font-size:18px;">Monthly Sales Trend (Year to Date)</h2>
+                                <img class="trend-chart-image" src="${trendChartImage}">
+                            </div>
                         `
                         : ""
                 }
@@ -29403,6 +29733,9 @@ window.DashboardPresentation = (() => {
             salesmenSub: "مرتبون حسب نسبة تحقيق الهدف",
             salesman: "المندوب",
             noTarget: "بدون هدف",
+            visits: "الزيارات",
+            visitConversion: "تحويل الزيارات",
+            hlConversion: "أعلى تحويل للزيارات: {name} ({branch}) بنسبة {pct}.",
             branchRank: "المركز {rank} من {total} حسب صافي المبيعات",
             branchCustomers: "{new} عميل جديد و{re} معاد تنشيطه",
             branchSalesmen: "المندوبون",
@@ -29490,6 +29823,9 @@ window.DashboardPresentation = (() => {
             salesmenSub: "Ranked by target achievement",
             salesman: "Salesman",
             noTarget: "No target",
+            visits: "Visits",
+            visitConversion: "Visit conversion",
+            hlConversion: "Best visit conversion: {name} ({branch}) at {pct}.",
             branchRank: "Rank {rank} of {total} by net sales",
             branchCustomers: "{new} new and {re} reactivated customers",
             branchSalesmen: "Salesmen",
@@ -29741,6 +30077,25 @@ window.DashboardPresentation = (() => {
         return toNum(row["monthlyTargetQ" + quarter]);
     }
 
+    function monthKeysBetween(from, to) {
+        const keys = [];
+        let year = Number(String(from).slice(0, 4));
+        let month = Number(String(from).slice(5, 7));
+        const endYear = Number(String(to).slice(0, 4));
+        const endMonth = Number(String(to).slice(5, 7));
+
+        while ((year < endYear || (year === endYear && month <= endMonth)) && keys.length < 120) {
+            keys.push(`${year}-${String(month).padStart(2, "0")}`);
+            month += 1;
+            if (month > 12) {
+                month = 1;
+                year += 1;
+            }
+        }
+
+        return keys;
+    }
+
     function agingIndex(row) {
         if (String(row.status || "").toLowerCase() !== "overdue") {
             return 0;
@@ -29767,6 +30122,8 @@ window.DashboardPresentation = (() => {
             quantity: 0,
             newCustomers: 0,
             reactivated: 0,
+            visits: 0,
+            visitInvoices: 0,
             invoiceSet: new Set(),
             customerSet: new Set(),
             aging: [0, 0, 0, 0, 0, 0],
@@ -29849,7 +30206,12 @@ window.DashboardPresentation = (() => {
                     target: 0,
                     collections: 0,
                     outstanding: 0,
-                    overdue: 0
+                    overdue: 0,
+                    visits: 0,
+                    visitInvoices: 0,
+                    conversion: null,
+                    visitMonths: new Set(),
+                    invoiceMonths: new Map()
                 };
                 salesmen.set(key, salesman);
             } else if (salesman.name === salesman.code && clean(name)) {
@@ -29889,7 +30251,18 @@ window.DashboardPresentation = (() => {
                 addKeyed(aggregate.productSales, productKey, productLabel, amount, quantity);
             });
 
-            salesmanOf(row.salesmanCode, row.salesmanName, row.branch).sales += amount;
+            const invoiceSalesman = salesmanOf(row.salesmanCode, row.salesmanName, row.branch);
+            invoiceSalesman.sales += amount;
+
+            const invoiceMonth = String(row.invoiceDate || "").slice(0, 7);
+
+            if (invoiceKey && invoiceMonth) {
+                if (!invoiceSalesman.invoiceMonths.has(invoiceMonth)) {
+                    invoiceSalesman.invoiceMonths.set(invoiceMonth, new Set());
+                }
+
+                invoiceSalesman.invoiceMonths.get(invoiceMonth).add(invoiceKey);
+            }
         });
 
         collections.forEach(row => {
@@ -29941,6 +30314,48 @@ window.DashboardPresentation = (() => {
             company.reactivated += 1;
         });
 
+        /*
+         * الزيارات (شيت Visits by Month) للفترة المختارة.
+         * التحويل = فواتير الشهور اللي فيها زيارات ÷ الزيارات.
+         */
+        const monthKeySet = new Set(monthKeysBetween(period.from, period.to));
+        const visitRows = Array.isArray(window.DashboardVisits) ? window.DashboardVisits : [];
+        let hasVisits = false;
+
+        visitRows.forEach(row => {
+            const code = clean(row.salesmanCode);
+            const month = String(row.month || "");
+            const visits = toNum(row.visits);
+
+            if (!code || !salesmen.has(code) || !monthKeySet.has(month) || !(visits > 0)) {
+                return;
+            }
+
+            const salesman = salesmen.get(code);
+            salesman.visits += visits;
+            salesman.visitMonths.add(month);
+            hasVisits = true;
+        });
+
+        salesmen.forEach(salesman => {
+            salesman.visitInvoices = [...salesman.visitMonths].reduce(
+                (sum, month) => sum + (salesman.invoiceMonths.get(month)?.size || 0),
+                0
+            );
+            salesman.conversion = salesman.visits > 0
+                ? (salesman.visitInvoices / salesman.visits) * 100
+                : null;
+
+            if (salesman.visits > 0) {
+                [branches.get(salesman.branch), company].forEach(aggregate => {
+                    if (aggregate) {
+                        aggregate.visits += salesman.visits;
+                        aggregate.visitInvoices += salesman.visitInvoices;
+                    }
+                });
+            }
+        });
+
         const branchList = [...branches.values()]
             .filter(branch =>
                 branch.sales ||
@@ -29964,7 +30379,8 @@ window.DashboardPresentation = (() => {
             company,
             branches: branchList,
             salesmen: salesmanList,
-            scopeBranch: clean(data.filters?.branch)
+            scopeBranch: clean(data.filters?.branch),
+            hasVisits
         };
     }
 
@@ -30056,6 +30472,20 @@ window.DashboardPresentation = (() => {
             }));
         }
 
+        if (model.hasVisits) {
+            const topConverter = model.salesmen
+                .filter(salesman => salesman.visits >= 20 && salesman.conversion != null)
+                .sort((a, b) => b.conversion - a.conversion)[0];
+
+            if (topConverter) {
+                items.push(tx("hlConversion", {
+                    name: topConverter.name,
+                    branch: topConverter.branch,
+                    pct: fmtPct(topConverter.conversion)
+                }));
+            }
+        }
+
         items.push(tx("hlCustomers", {
             new: fmtInt(model.company.newCustomers),
             re: fmtInt(model.company.reactivated)
@@ -30101,6 +30531,12 @@ window.DashboardPresentation = (() => {
             [tx("activeCustomers"), fmtInt(company.customerSet.size)],
             [tx("newCustomers"), fmtInt(company.newCustomers)],
             [tx("reactivated"), fmtInt(company.reactivated)],
+            ...(model.hasVisits
+                ? [
+                      [tx("visits"), fmtInt(company.visits)],
+                      [tx("visitConversion"), fmtPct(ratio(company.visitInvoices, company.visits))]
+                  ]
+                : []),
             [tx("quantity"), fmtInt(company.quantity)]
         ];
 
@@ -30277,7 +30713,9 @@ window.DashboardPresentation = (() => {
                             <th class="n">${esc(tx("target"))}</th>
                             <th>${esc(tx("achievement"))}</th>
                             <th class="n">${esc(tx("collections"))}</th>
-                            <th class="n">${esc(tx("outstanding"))}</th>
+                            ${model.hasVisits
+                                ? `<th class="n">${esc(tx("visits"))}</th><th class="n">${esc(tx("visitConversion"))}</th>`
+                                : `<th class="n">${esc(tx("outstanding"))}</th>`}
                             <th class="n">${esc(tx("overdue"))}</th>
                         </tr>
                     </thead>
@@ -30291,9 +30729,11 @@ window.DashboardPresentation = (() => {
                                 <td class="n">${salesman.target > 0 ? fmtInt(salesman.target) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
                                 <td>${meter(ratio(salesman.sales, salesman.target))}</td>
                                 <td class="n">${fmtInt(salesman.collections)}</td>
-                                <td class="n">${fmtInt(salesman.outstanding)}</td>
+                                ${model.hasVisits
+                                    ? `<td class="n">${salesman.visits ? fmtInt(salesman.visits) : "—"}</td><td class="n pz-strong">${fmtPct(salesman.conversion)}</td>`
+                                    : `<td class="n">${fmtInt(salesman.outstanding)}</td>`}
                                 <td class="n">${fmtInt(salesman.overdue)}</td>
-                            </tr>`).join("") : emptyRow(9)}
+                            </tr>`).join("") : emptyRow(model.hasVisits ? 10 : 9)}
                     </tbody>
                 </table>`
         }));
@@ -30331,25 +30771,27 @@ window.DashboardPresentation = (() => {
                     <div class="pz-col">
                         <div>
                             <h3 class="pz-h3">${esc(tx("branchSalesmen"))}</h3>
-                            <table class="pz-table is-medium">
+                            <table class="pz-table ${model.hasVisits ? "is-small is-tight" : "is-medium"}">
                                 <thead>
                                     <tr>
                                         <th>${esc(tx("salesman"))}</th>
                                         <th class="n">${esc(tx("sales"))}</th>
                                         <th>${esc(tx("achievement"))}</th>
                                         <th class="n">${esc(tx("collections"))}</th>
+                                        ${model.hasVisits ? `<th class="n">${esc(tx("visitConversion"))}</th>` : ""}
                                         <th class="n">${esc(tx("overdue"))}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${salesmen.length ? salesmen.map(salesman => `
                                         <tr>
-                                            <td class="pz-strong" style="--clip:170px">${clip(salesman.name)}</td>
+                                            <td class="pz-strong" style="--clip:${model.hasVisits ? 130 : 170}px">${clip(salesman.name)}</td>
                                             <td class="n">${fmtInt(salesman.sales)}</td>
                                             <td>${salesman.target > 0 ? meter(ratio(salesman.sales, salesman.target)) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
                                             <td class="n">${fmtInt(salesman.collections)}</td>
+                                            ${model.hasVisits ? `<td class="n">${fmtPct(salesman.conversion)}</td>` : ""}
                                             <td class="n">${fmtInt(salesman.overdue)}</td>
-                                        </tr>`).join("") : emptyRow(5)}
+                                        </tr>`).join("") : emptyRow(model.hasVisits ? 6 : 5)}
                                 </tbody>
                             </table>
                         </div>
@@ -30703,6 +31145,9 @@ html[lang="en"] body { font-family: "Inter", "Cairo", "Segoe UI", sans-serif; }
 .pz-table.is-medium { font-size: 13px; }
 .pz-table.is-medium td { padding: 7px 9px; }
 .pz-table.is-small { font-size: 12px; }
+.pz-table.is-tight th, .pz-table.is-tight td { padding-left: 5px; padding-right: 5px; }
+.pz-table.is-tight .pz-meter { min-width: 84px; gap: 5px; }
+.pz-table.is-tight .pz-meter b { min-width: 40px; }
 .pz-table.is-small th { padding: 6px 8px; }
 .pz-table.is-small td { padding: 5px 8px; }
 .pz-empty-cell { text-align: center; color: #8595a2; padding: 14px 8px; }
