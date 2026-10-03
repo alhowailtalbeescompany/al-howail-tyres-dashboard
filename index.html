@@ -32404,7 +32404,7 @@ window.DashboardBranchReport = (() => {
         const activityTable = list => table(
             [{ t: t.customerCode }, { t: t.customer }, { t: t.salesman }, { t: t.date }],
             [...list].sort((a, b) => String(b.date).localeCompare(String(a.date))).map(item => `
-                <tr><td>${esc(item.code)}</td><td class="strong">${esc(item.name)}</td><td>${esc(item.salesman)}</td><td>${esc(fmtDay(item.date))}</td></tr>`)
+                <tr><td>${esc(item.code)}</td><td class="strong wrap">${esc(item.name)}</td><td class="wrap">${esc(item.salesman)}</td><td>${esc(fmtDay(item.date))}</td></tr>`)
         );
 
         return `
@@ -32482,11 +32482,8 @@ window.DashboardBranchReport = (() => {
                         topProducts.map(p => `<tr><td>${esc(p.label)}</td><td class="n">${money(p.qty)}</td><td class="n">${money(p.amount)}</td></tr>`)
                     )}` : ""}
 
-                ${model.hasNew || model.hasReactivated ? `
-                    <div class="grid-2">
-                        ${model.hasNew ? `<div><h3>${esc(t.newList)} (${branch.newList.length})</h3>${activityTable(branch.newList)}</div>` : ""}
-                        ${model.hasReactivated ? `<div><h3>${esc(t.reactivatedList)} (${branch.reactivatedList.length})</h3>${activityTable(branch.reactivatedList)}</div>` : ""}
-                    </div>` : ""}
+                ${model.hasNew ? `<h3>${esc(t.newList)} (${branch.newList.length})</h3>${activityTable(branch.newList)}` : ""}
+                ${model.hasReactivated ? `<h3>${esc(t.reactivatedList)} (${branch.reactivatedList.length})</h3>${activityTable(branch.reactivatedList)}` : ""}
             </section>`;
     }
 
@@ -32580,7 +32577,8 @@ h3 { font-size: 12.5px; font-weight: 800; margin: 10px 0 5px; padding-inline-sta
 .kpi.is-warn { border-top-color: #c98a12; } .kpi.is-warn strong { color: #a8700a; }
 .kpi.is-bad { border-top-color: #c0392b; } .kpi.is-bad strong { color: #c0392b; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.grid-2 > div { min-width: 0; }
+.grid-2 > div { min-width: 0; overflow: hidden; }
+.grid-2 td.clip, .grid-2 td.clip-s, td.wrap { white-space: normal; overflow-wrap: anywhere; }
 table { width: 100%; border-collapse: collapse; }
 thead { display: table-header-group; } tfoot { display: table-row-group; }
 tr { break-inside: avoid; page-break-inside: avoid; }
