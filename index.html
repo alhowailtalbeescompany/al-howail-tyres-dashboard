@@ -4385,6 +4385,44 @@ body.visits-disabled [data-visits-feature] {
 .profile-visits-card .table-total-row td {
     background: var(--surface-soft);
 }
+
+/* ===== Comprehensive branch report ===== */
+.branch-report-card {
+    height: calc(100vh - 56px);
+}
+
+.branch-report-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.branch-report-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.branch-report-select select {
+    min-width: 200px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.branch-report-frame {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    background: #ffffff;
+}
 </style>
 </head>
 
@@ -28103,6 +28141,12 @@ window.DashboardReports = (() => {
     }
 
     function runReport(type) {
+        /* تقرير الفرع الشامل */
+        if (type === "branch" && window.DashboardBranchReport) {
+            window.DashboardBranchReport.open();
+            return true;
+        }
+
         const report = getReport(type);
 
         if (!report) {
@@ -31719,6 +31763,1078 @@ body.pz-present .pz-controls {
 
 </script>
 <script>
+/* ===== branch-report.js ===== */
+"use strict";
+
+/* =========================================================
+   تقرير الفرع الشامل
+   كل معلومات الفرع في تقرير واحد للطباعة / PDF / Excel
+========================================================= */
+
+window.DashboardBranchReport = (() => {
+    const utils = window.DashboardUtils;
+
+    const TEXT = {
+        ar: {
+            title: "تقرير الفرع الشامل",
+            allBranches: "كل الفروع",
+            branch: "الفرع",
+            chooseBranch: "اختر الفرع",
+            print: "طباعة / PDF",
+            excel: "تصدير Excel",
+            period: "الفترة",
+            generated: "تاريخ الإصدار",
+            companySummary: "ملخص الشركة",
+            branchComparison: "مقارنة الفروع",
+            kpis: "المؤشرات الرئيسية",
+            sales: "صافي المبيعات",
+            target: "هدف الفترة",
+            achievement: "نسبة التحقيق",
+            remaining: "المتبقي للهدف",
+            collections: "التحصيلات",
+            collectionRate: "نسبة التحصيل",
+            outstanding: "إجمالي المديونية",
+            due: "مستحق",
+            overdue: "متأخر",
+            overdueShare: "نسبة المتأخر",
+            invoices: "عدد الفواتير",
+            avgInvoice: "متوسط الفاتورة",
+            activeCustomers: "العملاء المشترين",
+            quantity: "الكمية المباعة",
+            newCustomers: "عملاء جدد",
+            reactivated: "عملاء معاد تنشيطهم",
+            visits: "الزيارات",
+            conversion: "تحويل الزيارات",
+            salesmen: "أداء المندوبين",
+            code: "الكود",
+            salesman: "المندوب",
+            noTarget: "بدون هدف",
+            monthly: "الأداء الشهري",
+            month: "الشهر",
+            aging: "أعمار المديونية",
+            notDue: "غير مستحق",
+            b1: "1 - 30 يوم",
+            b2: "31 - 60",
+            b3: "61 - 90",
+            b4: "91 - 180",
+            b5: "أكثر من 180",
+            total: "الإجمالي",
+            topCustomers: "أعلى 10 عملاء مبيعًا",
+            customer: "العميل",
+            customerCode: "كود العميل",
+            topOverdue: "أعلى 10 عملاء متأخرات",
+            balance: "الرصيد",
+            days: "أيام التأخير",
+            creditRisk: "عملاء تجاوزوا الحد الائتماني",
+            creditLimit: "الحد الائتماني",
+            exceededBy: "التجاوز",
+            topProducts: "أعلى 10 منتجات",
+            product: "المنتج",
+            qty: "الكمية",
+            value: "القيمة",
+            newList: "العملاء الجدد",
+            reactivatedList: "العملاء المعاد تنشيطهم",
+            date: "التاريخ",
+            upcoming: "تحصيلات خلال 10 أيام",
+            dueDate: "تاريخ الاستحقاق",
+            daysLeft: "الأيام المتبقية",
+            none: "لا توجد بيانات",
+            noData: "لا توجد بيانات لعرضها.",
+            note: "المبالغ بالريال السعودي، والمبيعات بدون ضريبة القيمة المضافة. المديونية بالرصيد الحالي.",
+            fromTo: (from, to) => `من ${from} إلى ${to}`,
+            ofCount: (a, b) => `${a} من ${b}`
+        },
+        en: {
+            title: "Comprehensive Branch Report",
+            allBranches: "All branches",
+            branch: "Branch",
+            chooseBranch: "Choose branch",
+            print: "Print / PDF",
+            excel: "Export Excel",
+            period: "Period",
+            generated: "Generated on",
+            companySummary: "Company summary",
+            branchComparison: "Branch comparison",
+            kpis: "Key figures",
+            sales: "Net sales",
+            target: "Period target",
+            achievement: "Achievement",
+            remaining: "Remaining to target",
+            collections: "Collections",
+            collectionRate: "Collection rate",
+            outstanding: "Total receivables",
+            due: "Due",
+            overdue: "Overdue",
+            overdueShare: "Overdue share",
+            invoices: "Invoices",
+            avgInvoice: "Average invoice",
+            activeCustomers: "Purchasing customers",
+            quantity: "Units sold",
+            newCustomers: "New customers",
+            reactivated: "Reactivated customers",
+            visits: "Visits",
+            conversion: "Visit conversion",
+            salesmen: "Salesman performance",
+            code: "Code",
+            salesman: "Salesman",
+            noTarget: "No target",
+            monthly: "Monthly performance",
+            month: "Month",
+            aging: "Receivables aging",
+            notDue: "Not due",
+            b1: "1 - 30 days",
+            b2: "31 - 60",
+            b3: "61 - 90",
+            b4: "91 - 180",
+            b5: "Over 180",
+            total: "Total",
+            topCustomers: "Top 10 customers by sales",
+            customer: "Customer",
+            customerCode: "Customer code",
+            topOverdue: "Top 10 overdue customers",
+            balance: "Balance",
+            days: "Days late",
+            creditRisk: "Customers over credit limit",
+            creditLimit: "Credit limit",
+            exceededBy: "Exceeded by",
+            topProducts: "Top 10 products",
+            product: "Product",
+            qty: "Qty",
+            value: "Value",
+            newList: "New customers",
+            reactivatedList: "Reactivated customers",
+            date: "Date",
+            upcoming: "Collections due within 10 days",
+            dueDate: "Due date",
+            daysLeft: "Days left",
+            none: "No data",
+            noData: "There is no data to show.",
+            note: "Amounts in SAR. Sales exclude VAT. Receivables show the current balance.",
+            fromTo: (from, to) => `${from} to ${to}`,
+            ofCount: (a, b) => `${a} of ${b}`
+        }
+    };
+
+    const state = {
+        data: null,
+        balances: [],
+        selected: "",
+        lastModel: null
+    };
+
+    /* ---------------- helpers ---------------- */
+
+    const lang = () => (utils.getLanguage() === "en" ? "en" : "ar");
+    const L = () => TEXT[lang()];
+    const esc = value => utils.escapeHTML(value == null ? "" : String(value));
+    const num = value => utils.toNumber(value);
+    const clean = value => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    const key = value => clean(value).toLowerCase();
+
+    const intFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+    const money = value => intFormat.format(Math.round(num(value)));
+    const pct = value =>
+        value == null || !isFinite(value) ? "—" : `\u2066${value.toFixed(1)}%\u2069`;
+    const ratio = (a, b) => (b > 0 ? (a / b) * 100 : null);
+
+    function tone(value, kind = "achievement") {
+        if (value == null) return "is-none";
+        if (kind === "overdue") return value <= 20 ? "is-good" : value <= 40 ? "is-warn" : "is-bad";
+        return value >= 100 ? "is-good" : value >= 80 ? "is-warn" : "is-bad";
+    }
+
+    function fmtDay(value) {
+        const text = String(value || "").slice(0, 10);
+        const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+        if (!match) return text || "—";
+
+        return new Intl.DateTimeFormat(lang() === "en" ? "en-GB" : "ar-SA-u-ca-gregory-nu-latn", {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+        }).format(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    }
+
+    function fmtMonth(monthKey) {
+        const [year, month] = String(monthKey).split("-").map(Number);
+
+        if (!year || !month) return monthKey;
+
+        return new Intl.DateTimeFormat(lang() === "en" ? "en-GB" : "ar-SA-u-ca-gregory-nu-latn", {
+            month: "long",
+            year: "numeric"
+        }).format(new Date(year, month - 1, 1));
+    }
+
+    const branchOf = row => clean(row?.branch || row?.sheetBranch || "");
+    const salesmanCodeOf = row => clean(row?.salesmanCode || "");
+    const invoiceNoOf = row => clean(row?.invoiceNo || row?.invoiceNumber || "");
+    const customerKeyOf = row => clean(row?.customerCode || "") || clean(row?.customerName || "");
+
+    function monthKeys() {
+        const period = window.DashboardTargets?.getPeriod?.();
+
+        if (period && Array.isArray(period.months) && period.months.length) {
+            return {
+                keys: period.months.map(item => `${item.year}-${String(item.month).padStart(2, "0")}`),
+                from: period.from,
+                to: period.to
+            };
+        }
+
+        const dates = (state.data?.invoices || [])
+            .map(row => String(row.invoiceDate || "").slice(0, 10))
+            .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value))
+            .sort();
+
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const from = dates[0] || today;
+        const to = dates[dates.length - 1] || today;
+
+        const keys = [];
+        let year = Number(from.slice(0, 4));
+        let month = Number(from.slice(5, 7));
+        const endYear = Number(to.slice(0, 4));
+        const endMonth = Number(to.slice(5, 7));
+
+        while ((year < endYear || (year === endYear && month <= endMonth)) && keys.length < 60) {
+            keys.push(`${year}-${String(month).padStart(2, "0")}`);
+            month += 1;
+            if (month > 12) {
+                month = 1;
+                year += 1;
+            }
+        }
+
+        return { keys, from, to };
+    }
+
+    function periodTarget(row) {
+        const targets = window.DashboardTargets;
+
+        if (targets?.getSelectedPeriodTarget) {
+            return num(targets.getSelectedPeriodTarget(row));
+        }
+
+        return num(row.monthlyTargetQ1);
+    }
+
+    function agingIndex(row) {
+        if (String(row.status || "").toLowerCase() !== "overdue") return 0;
+        const days = num(row.overdueDays);
+        if (days <= 30) return 1;
+        if (days <= 60) return 2;
+        if (days <= 90) return 3;
+        if (days <= 180) return 4;
+        return 5;
+    }
+
+    function addTo(map, mapKey, label, amount, extra = {}) {
+        if (!mapKey) return;
+
+        let entry = map.get(mapKey);
+
+        if (!entry) {
+            entry = { key: mapKey, label: label || mapKey, amount: 0, qty: 0, count: new Set(), days: 0, salesman: "", creditLimit: 0 };
+            map.set(mapKey, entry);
+        }
+
+        entry.amount += amount;
+        entry.qty += extra.qty || 0;
+        if (extra.invoiceNo) entry.count.add(extra.invoiceNo);
+        if (extra.days) entry.days = Math.max(entry.days, extra.days);
+        if (extra.salesman && !entry.salesman) entry.salesman = extra.salesman;
+        if (extra.creditLimit) entry.creditLimit = Math.max(entry.creditLimit, extra.creditLimit);
+        if (!entry.label && label) entry.label = label;
+    }
+
+    /* ---------------- model ---------------- */
+
+    function emptyBranch(name) {
+        return {
+            name,
+            sales: 0,
+            target: 0,
+            collections: 0,
+            due: 0,
+            overdue: 0,
+            quantity: 0,
+            visits: 0,
+            visitInvoices: 0,
+            invoiceSet: new Set(),
+            customerSet: new Set(),
+            aging: [0, 0, 0, 0, 0, 0],
+            salesmen: new Map(),
+            months: new Map(),
+            customers: new Map(),
+            products: new Map(),
+            overdueCustomers: new Map(),
+            balanceCustomers: new Map(),
+            newList: [],
+            reactivatedList: [],
+            upcoming: []
+        };
+    }
+
+    function buildModel() {
+        const data = state.data || {};
+        const period = monthKeys();
+        const monthSet = new Set(period.keys);
+        const branches = new Map();
+        const company = emptyBranch(L().allBranches);
+
+        const getBranch = name => {
+            const branchName = clean(name) || "—";
+            const branchKey = key(branchName);
+
+            if (!branches.has(branchKey)) branches.set(branchKey, emptyBranch(branchName));
+            return branches.get(branchKey);
+        };
+
+        const getSalesman = (aggregate, code, name) => {
+            const salesmanKey = clean(code) || "—";
+
+            if (!aggregate.salesmen.has(salesmanKey)) {
+                aggregate.salesmen.set(salesmanKey, {
+                    code: salesmanKey,
+                    name: clean(name) || salesmanKey,
+                    target: 0,
+                    sales: 0,
+                    collections: 0,
+                    due: 0,
+                    overdue: 0,
+                    invoiceSet: new Set(),
+                    invoiceMonths: new Map(),
+                    visits: 0,
+                    visitMonths: new Set(),
+                    newCustomers: 0
+                });
+            }
+
+            const salesman = aggregate.salesmen.get(salesmanKey);
+            if ((salesman.name === salesman.code || !salesman.name) && clean(name)) salesman.name = clean(name);
+            return salesman;
+        };
+
+        const getMonth = (aggregate, monthKey) => {
+            if (!aggregate.months.has(monthKey)) {
+                aggregate.months.set(monthKey, { sales: 0, collections: 0, invoiceSet: new Set(), visits: 0 });
+            }
+            return aggregate.months.get(monthKey);
+        };
+
+        (data.target || []).forEach(row => {
+            const value = periodTarget(row);
+            const branch = getBranch(row.branch);
+            branch.target += value;
+            company.target += value;
+            getSalesman(branch, row.salesmanCode, row.salesmanName).target += value;
+        });
+
+        (data.invoices || []).forEach(row => {
+            const amount = num(row.salesWithoutTax);
+            const qty = num(row.invoiceQuantity);
+            const invoiceNo = invoiceNoOf(row);
+            const customerKey = customerKeyOf(row);
+            const monthKey = String(row.invoiceDate || "").slice(0, 7);
+            const productKey = clean(row.productCode) || clean(row.productDescription);
+            const branch = getBranch(branchOf(row));
+
+            [branch, company].forEach(aggregate => {
+                aggregate.sales += amount;
+                aggregate.quantity += qty;
+                if (invoiceNo) aggregate.invoiceSet.add(invoiceNo);
+                if (customerKey) aggregate.customerSet.add(customerKey);
+                addTo(aggregate.customers, customerKey, clean(row.customerName), amount, { invoiceNo });
+                addTo(aggregate.products, productKey, clean(row.productDescription) || clean(row.productCode), amount, { qty });
+
+                if (monthKey) {
+                    const month = getMonth(aggregate, monthKey);
+                    month.sales += amount;
+                    if (invoiceNo) month.invoiceSet.add(invoiceNo);
+                }
+            });
+
+            const salesman = getSalesman(branch, salesmanCodeOf(row), row.salesmanName);
+            salesman.sales += amount;
+
+            if (invoiceNo) {
+                salesman.invoiceSet.add(invoiceNo);
+
+                if (monthKey) {
+                    if (!salesman.invoiceMonths.has(monthKey)) salesman.invoiceMonths.set(monthKey, new Set());
+                    salesman.invoiceMonths.get(monthKey).add(invoiceNo);
+                }
+            }
+        });
+
+        (data.collections || []).forEach(row => {
+            const amount = num(row.collectionAmount);
+            const monthKey = String(row.collectionDate || "").slice(0, 7);
+            const branch = getBranch(branchOf(row));
+
+            [branch, company].forEach(aggregate => {
+                aggregate.collections += amount;
+                if (monthKey) getMonth(aggregate, monthKey).collections += amount;
+            });
+
+            getSalesman(branch, salesmanCodeOf(row), row.salesmanName).collections += amount;
+        });
+
+        (state.balances || []).forEach(row => {
+            const amount = num(row.invoiceBalance);
+            const isOverdue = String(row.status || "").toLowerCase() === "overdue";
+            const customerKey = customerKeyOf(row);
+            const branch = getBranch(branchOf(row));
+            const remaining = num(row.daysRemainingToCollect ?? row.daysUntilDue ?? row.daysToDue);
+
+            [branch, company].forEach(aggregate => {
+                aggregate.aging[agingIndex(row)] += amount;
+
+                if (isOverdue) {
+                    aggregate.overdue += amount;
+                    addTo(aggregate.overdueCustomers, customerKey, clean(row.customerName), amount, {
+                        days: num(row.overdueDays),
+                        salesman: clean(row.salesmanName)
+                    });
+                } else {
+                    aggregate.due += amount;
+                }
+
+                addTo(aggregate.balanceCustomers, customerKey, clean(row.customerName), amount, {
+                    creditLimit: num(row.creditLimit),
+                    salesman: clean(row.salesmanName)
+                });
+
+                if (!isOverdue && amount > 0 && remaining >= 0 && remaining <= 10) {
+                    aggregate.upcoming.push({
+                        customer: clean(row.customerName),
+                        invoiceNo: invoiceNoOf(row),
+                        salesman: clean(row.salesmanName),
+                        dueDate: row.dueDate || "",
+                        remaining,
+                        amount
+                    });
+                }
+            });
+
+            const salesman = getSalesman(branch, salesmanCodeOf(row), row.salesmanName);
+            if (isOverdue) salesman.overdue += amount;
+            else salesman.due += amount;
+        });
+
+        const activity = (rows, listKey) => {
+            (rows || []).forEach(row => {
+                const entry = {
+                    code: clean(row.customerCode),
+                    name: clean(row.customerName),
+                    date: row.activityDate || "",
+                    salesman: clean(row.salesmanName) || salesmanCodeOf(row)
+                };
+                const branch = getBranch(branchOf(row));
+                branch[listKey].push(entry);
+                company[listKey].push(entry);
+
+                if (listKey === "newList") {
+                    getSalesman(branch, salesmanCodeOf(row), row.salesmanName).newCustomers += 1;
+                }
+            });
+        };
+
+        activity(data.newCustomers, "newList");
+        activity(data.reactivatedCustomers, "reactivatedList");
+
+        /* Visits (Visits by Month) */
+        let hasVisits = false;
+
+        (Array.isArray(window.DashboardVisits) ? window.DashboardVisits : []).forEach(row => {
+            const visits = num(row.visits);
+            const monthKey = String(row.month || "");
+            const code = salesmanCodeOf(row);
+
+            if (!(visits > 0) || !monthSet.has(monthKey) || !code) return;
+
+            const branch = branches.get(key(branchOf(row)));
+            if (!branch || !branch.salesmen.has(code)) return;
+
+            const salesman = branch.salesmen.get(code);
+            salesman.visits += visits;
+            salesman.visitMonths.add(monthKey);
+            hasVisits = true;
+
+            [branch, company].forEach(aggregate => {
+                getMonth(aggregate, monthKey).visits += visits;
+            });
+        });
+
+        branches.forEach(branch => {
+            branch.salesmen.forEach(salesman => {
+                salesman.visitInvoices = [...salesman.visitMonths].reduce(
+                    (sum, monthKey) => sum + (salesman.invoiceMonths.get(monthKey)?.size || 0),
+                    0
+                );
+
+                if (salesman.visits > 0) {
+                    branch.visits += salesman.visits;
+                    branch.visitInvoices += salesman.visitInvoices;
+                    company.visits += salesman.visits;
+                    company.visitInvoices += salesman.visitInvoices;
+                }
+            });
+        });
+
+        const branchList = [...branches.values()]
+            .filter(branch => branch.sales || branch.target || branch.collections || branch.due || branch.overdue)
+            .sort((a, b) => b.sales - a.sales);
+
+        return {
+            period,
+            company,
+            branches: branchList,
+            hasVisits,
+            hasProducts: [...company.products.values()].some(item => item.amount > 0),
+            hasNew: company.newList.length > 0,
+            hasReactivated: company.reactivatedList.length > 0
+        };
+    }
+
+    /* ---------------- HTML ---------------- */
+
+    const table = (head, rows, footer = "", cls = "") => `
+        <table class="${cls}">
+            <thead><tr>${head.map(cell => `<th class="${cell.n ? "n" : ""}">${esc(cell.t)}</th>`).join("")}</tr></thead>
+            <tbody>${rows.length ? rows.join("") : `<tr><td colspan="${head.length}" class="empty">${esc(L().none)}</td></tr>`}</tbody>
+            ${footer ? `<tfoot>${footer}</tfoot>` : ""}
+        </table>`;
+
+    const meter = value => {
+        const fill = value == null ? 0 : Math.max(0, Math.min(100, value));
+        return `<div class="meter ${tone(value)}"><span class="track"><i style="width:${fill.toFixed(1)}%"></i></span><b>${pct(value)}</b></div>`;
+    };
+
+    function kpiGrid(branch, model) {
+        const t = L();
+        const achievement = ratio(branch.sales, branch.target);
+        const overdueShare = ratio(branch.overdue, branch.due + branch.overdue);
+        const invoices = branch.invoiceSet.size;
+
+        const items = [
+            [t.sales, money(branch.sales)],
+            [t.target, branch.target > 0 ? money(branch.target) : "—"],
+            [t.achievement, pct(achievement), tone(achievement)],
+            [t.remaining, branch.target > 0 ? money(Math.max(branch.target - branch.sales, 0)) : "—"],
+            [t.collections, money(branch.collections)],
+            [t.collectionRate, pct(ratio(branch.collections, branch.sales))],
+            [t.outstanding, money(branch.due + branch.overdue)],
+            [t.due, money(branch.due)],
+            [t.overdue, money(branch.overdue), tone(overdueShare, "overdue")],
+            [t.overdueShare, pct(overdueShare), tone(overdueShare, "overdue")],
+            [t.invoices, money(invoices)],
+            [t.avgInvoice, invoices ? money(branch.sales / invoices) : "—"],
+            [t.activeCustomers, money(branch.customerSet.size)],
+            [t.quantity, money(branch.quantity)]
+        ];
+
+        if (model.hasNew) items.push([t.newCustomers, money(branch.newList.length)]);
+        if (model.hasReactivated) items.push([t.reactivated, money(branch.reactivatedList.length)]);
+        if (model.hasVisits) {
+            items.push([t.visits, money(branch.visits)]);
+            items.push([t.conversion, pct(ratio(branch.visitInvoices, branch.visits))]);
+        }
+
+        return `<div class="kpis">${items.map(([label, value, cls]) => `
+            <div class="kpi ${cls || ""}"><span>${esc(label)}</span><strong>${value}</strong></div>`).join("")}</div>`;
+    }
+
+    function branchSection(branch, model, isFirst) {
+        const t = L();
+
+        const salesmen = [...branch.salesmen.values()]
+            .filter(s => s.sales || s.target || s.collections || s.due || s.overdue || s.visits)
+            .sort((a, b) => b.sales - a.sales);
+
+        const salesmanHead = [
+            { t: t.code }, { t: t.salesman }, { t: t.target, n: 1 }, { t: t.sales, n: 1 }, { t: t.achievement },
+            { t: t.collections, n: 1 }, { t: t.due, n: 1 }, { t: t.overdue, n: 1 }, { t: t.invoices, n: 1 },
+            ...(model.hasVisits ? [{ t: t.visits, n: 1 }, { t: t.conversion, n: 1 }] : []),
+            ...(model.hasNew ? [{ t: t.newCustomers, n: 1 }] : [])
+        ];
+
+        const salesmanRows = salesmen.map(s => `
+            <tr>
+                <td><bdi dir="ltr">${esc(s.code)}</bdi></td>
+                <td class="strong">${esc(s.name)}</td>
+                <td class="n">${s.target > 0 ? money(s.target) : `<span class="muted">${esc(t.noTarget)}</span>`}</td>
+                <td class="n">${money(s.sales)}</td>
+                <td>${s.target > 0 ? meter(ratio(s.sales, s.target)) : "—"}</td>
+                <td class="n">${money(s.collections)}</td>
+                <td class="n">${money(s.due)}</td>
+                <td class="n">${money(s.overdue)}</td>
+                <td class="n">${money(s.invoiceSet.size)}</td>
+                ${model.hasVisits ? `<td class="n">${s.visits ? money(s.visits) : "—"}</td><td class="n strong">${pct(ratio(s.visitInvoices, s.visits))}</td>` : ""}
+                ${model.hasNew ? `<td class="n">${money(s.newCustomers)}</td>` : ""}
+            </tr>`);
+
+        const monthRows = model.period.keys.map(monthKey => {
+            const month = branch.months.get(monthKey) || { sales: 0, collections: 0, invoiceSet: new Set(), visits: 0 };
+            return `
+                <tr>
+                    <td>${esc(fmtMonth(monthKey))}</td>
+                    <td class="n">${money(month.sales)}</td>
+                    <td class="n">${money(month.collections)}</td>
+                    <td class="n">${money(month.invoiceSet.size)}</td>
+                    ${model.hasVisits ? `<td class="n">${money(month.visits)}</td><td class="n">${pct(ratio(month.invoiceSet.size, month.visits))}</td>` : ""}
+                </tr>`;
+        });
+
+        const agingLabels = [t.notDue, t.b1, t.b2, t.b3, t.b4, t.b5];
+        const agingTotal = branch.aging.reduce((a, b) => a + b, 0);
+
+        const topCustomers = [...branch.customers.values()].sort((a, b) => b.amount - a.amount).slice(0, 10);
+        const topOverdue = [...branch.overdueCustomers.values()].sort((a, b) => b.amount - a.amount).slice(0, 10);
+        const creditRisk = [...branch.balanceCustomers.values()]
+            .filter(c => c.creditLimit > 0 && c.amount > c.creditLimit)
+            .sort((a, b) => (b.amount - b.creditLimit) - (a.amount - a.creditLimit))
+            .slice(0, 10);
+        const topProducts = [...branch.products.values()].sort((a, b) => b.amount - a.amount).slice(0, 10);
+        const upcoming = [...branch.upcoming].sort((a, b) => a.remaining - b.remaining || b.amount - a.amount).slice(0, 15);
+
+        const activityTable = list => table(
+            [{ t: t.customerCode }, { t: t.customer }, { t: t.salesman }, { t: t.date }],
+            [...list].sort((a, b) => String(b.date).localeCompare(String(a.date))).map(item => `
+                <tr><td>${esc(item.code)}</td><td class="strong">${esc(item.name)}</td><td>${esc(item.salesman)}</td><td>${esc(fmtDay(item.date))}</td></tr>`)
+        );
+
+        return `
+            <section class="branch ${isFirst ? "" : "new-page"}">
+                <div class="branch-title"><h2>${esc(t.branch)}: ${esc(branch.name)}</h2></div>
+
+                <h3>${esc(t.kpis)}</h3>
+                ${kpiGrid(branch, model)}
+
+                <h3>${esc(t.salesmen)}</h3>
+                ${table(salesmanHead, salesmanRows, "", "compact")}
+
+                <div class="grid-2">
+                    <div>
+                        <h3>${esc(t.monthly)}</h3>
+                        ${table(
+                            [{ t: t.month }, { t: t.sales, n: 1 }, { t: t.collections, n: 1 }, { t: t.invoices, n: 1 },
+                             ...(model.hasVisits ? [{ t: t.visits, n: 1 }, { t: t.conversion, n: 1 }] : [])],
+                            monthRows
+                        )}
+                    </div>
+                    <div>
+                        <h3>${esc(t.aging)}</h3>
+                        ${table(
+                            [{ t: "" }, { t: t.balance, n: 1 }, { t: "%", n: 1 }],
+                            agingLabels.map((label, index) => `
+                                <tr class="${index > 0 && branch.aging[index] > 0 ? "risk" : ""}">
+                                    <td>${esc(label)}</td>
+                                    <td class="n">${money(branch.aging[index])}</td>
+                                    <td class="n">${pct(ratio(branch.aging[index], agingTotal))}</td>
+                                </tr>`),
+                            `<tr><td>${esc(t.total)}</td><td class="n">${money(agingTotal)}</td><td class="n">${agingTotal ? pct(100) : "—"}</td></tr>`
+                        )}
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <h3>${esc(t.topCustomers)}</h3>
+                        ${table(
+                            [{ t: t.customer }, { t: t.invoices, n: 1 }, { t: t.sales, n: 1 }],
+                            topCustomers.map(c => `<tr><td class="clip">${esc(c.label)}</td><td class="n">${money(c.count.size)}</td><td class="n">${money(c.amount)}</td></tr>`)
+                        )}
+                    </div>
+                    <div>
+                        <h3>${esc(t.topOverdue)}</h3>
+                        ${table(
+                            [{ t: t.customer }, { t: t.salesman }, { t: t.balance, n: 1 }, { t: t.days, n: 1 }],
+                            topOverdue.map(c => `<tr><td class="clip">${esc(c.label)}</td><td class="clip-s">${esc(c.salesman)}</td><td class="n bad">${money(c.amount)}</td><td class="n">${money(c.days)}</td></tr>`)
+                        )}
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <h3>${esc(t.creditRisk)}</h3>
+                        ${table(
+                            [{ t: t.customer }, { t: t.balance, n: 1 }, { t: t.creditLimit, n: 1 }, { t: t.exceededBy, n: 1 }],
+                            creditRisk.map(c => `<tr><td class="clip">${esc(c.label)}</td><td class="n">${money(c.amount)}</td><td class="n">${money(c.creditLimit)}</td><td class="n bad">${money(c.amount - c.creditLimit)}</td></tr>`)
+                        )}
+                    </div>
+                    <div>
+                        <h3>${esc(t.upcoming)}</h3>
+                        ${table(
+                            [{ t: t.customer }, { t: t.dueDate }, { t: t.daysLeft, n: 1 }, { t: t.balance, n: 1 }],
+                            upcoming.map(u => `<tr><td class="clip">${esc(u.customer)}</td><td>${esc(fmtDay(u.dueDate))}</td><td class="n">${money(u.remaining)}</td><td class="n">${money(u.amount)}</td></tr>`)
+                        )}
+                    </div>
+                </div>
+
+                ${model.hasProducts ? `
+                    <h3>${esc(t.topProducts)}</h3>
+                    ${table(
+                        [{ t: t.product }, { t: t.qty, n: 1 }, { t: t.value, n: 1 }],
+                        topProducts.map(p => `<tr><td>${esc(p.label)}</td><td class="n">${money(p.qty)}</td><td class="n">${money(p.amount)}</td></tr>`)
+                    )}` : ""}
+
+                ${model.hasNew || model.hasReactivated ? `
+                    <div class="grid-2">
+                        ${model.hasNew ? `<div><h3>${esc(t.newList)} (${branch.newList.length})</h3>${activityTable(branch.newList)}</div>` : ""}
+                        ${model.hasReactivated ? `<div><h3>${esc(t.reactivatedList)} (${branch.reactivatedList.length})</h3>${activityTable(branch.reactivatedList)}</div>` : ""}
+                    </div>` : ""}
+            </section>`;
+    }
+
+    function comparisonSection(model) {
+        const t = L();
+
+        const rows = model.branches.map(b => {
+            const achievement = ratio(b.sales, b.target);
+            const overdueShare = ratio(b.overdue, b.due + b.overdue);
+            return `
+                <tr>
+                    <td class="strong">${esc(b.name)}</td>
+                    <td class="n">${money(b.sales)}</td>
+                    <td class="n">${b.target > 0 ? money(b.target) : "—"}</td>
+                    <td>${meter(achievement)}</td>
+                    <td class="n">${money(b.collections)}</td>
+                    <td class="n">${money(b.due)}</td>
+                    <td class="n">${money(b.overdue)}</td>
+                    <td class="n ${tone(overdueShare, "overdue")}">${pct(overdueShare)}</td>
+                    <td class="n">${money(b.invoiceSet.size)}</td>
+                    ${model.hasVisits ? `<td class="n">${pct(ratio(b.visitInvoices, b.visits))}</td>` : ""}
+                    ${model.hasNew ? `<td class="n">${money(b.newList.length)}</td>` : ""}
+                </tr>`;
+        });
+
+        return `
+            <section class="branch">
+                <div class="branch-title"><h2>${esc(t.companySummary)}</h2></div>
+                ${kpiGrid(model.company, model)}
+                <h3>${esc(t.branchComparison)}</h3>
+                ${table(
+                    [{ t: t.branch }, { t: t.sales, n: 1 }, { t: t.target, n: 1 }, { t: t.achievement }, { t: t.collections, n: 1 },
+                     { t: t.due, n: 1 }, { t: t.overdue, n: 1 }, { t: t.overdueShare, n: 1 }, { t: t.invoices, n: 1 },
+                     ...(model.hasVisits ? [{ t: t.conversion, n: 1 }] : []),
+                     ...(model.hasNew ? [{ t: t.newCustomers, n: 1 }] : [])],
+                    rows
+                )}
+            </section>`;
+    }
+
+    function buildDocument(model, selection) {
+        const t = L();
+        const isArabic = lang() === "ar";
+        const logo = document.querySelector(".sidebar-brand-logo img")?.getAttribute("src") || "";
+        const company = document.querySelector(".sidebar-brand-text span")?.textContent?.trim() || "";
+
+        const selected = selection
+            ? model.branches.filter(b => key(b.name) === key(selection))
+            : model.branches;
+
+        const body = selection
+            ? selected.map((b, i) => branchSection(b, model, i === 0)).join("")
+            : comparisonSection(model) + model.branches.map(b => branchSection(b, model, false)).join("");
+
+        const periodLabel = t.fromTo(fmtDay(model.period.from), fmtDay(model.period.to));
+        const docTitle = `Branch-Report_${selection ? selection.replace(/\s+/g, "-") : "All"}_${model.period.from}_${model.period.to}`;
+
+        return `<!DOCTYPE html>
+<html lang="${isArabic ? "ar" : "en"}" dir="${isArabic ? "rtl" : "ltr"}">
+<head>
+<meta charset="UTF-8">
+<title>${esc(docTitle)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 landscape; margin: 10mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: ${isArabic ? '"Cairo", "Inter"' : '"Inter", "Cairo"'}, "Segoe UI", Tahoma, sans-serif;
+    color: #0c2e42; font-size: 11px; font-variant-numeric: tabular-nums;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    background: #fff; padding: 14px;
+}
+@media print { body { padding: 0; } }
+header.doc { display: flex; align-items: center; gap: 14px; padding-bottom: 8px; border-bottom: 2px solid #0c2e42; margin-bottom: 10px; }
+header.doc img { height: 40px; }
+header.doc h1 { font-size: 20px; font-weight: 800; }
+header.doc p { color: #5b6b78; font-size: 11px; }
+header.doc dl { margin-inline-start: auto; display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10.5px; }
+header.doc dt { color: #5b6b78; } header.doc dd { font-weight: 700; }
+.branch-title { background: #0c2e42; color: #fff; padding: 7px 12px; margin: 4px 0 8px; }
+.branch-title h2 { font-size: 16px; font-weight: 800; }
+.new-page { break-before: page; page-break-before: always; }
+h3 { font-size: 12.5px; font-weight: 800; margin: 10px 0 5px; padding-inline-start: 8px; border-inline-start: 4px solid #1c95b8; break-after: avoid; }
+.kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.kpi { border: 1px solid #dfe6ec; border-top: 3px solid #1c95b8; padding: 5px 8px; break-inside: avoid; }
+.kpi span { display: block; color: #5b6b78; font-size: 10px; }
+.kpi strong { display: block; font-size: 15px; font-weight: 800; font-family: "Inter", "Cairo", sans-serif; }
+.kpi.is-good { border-top-color: #1f8a5b; } .kpi.is-good strong { color: #1f8a5b; }
+.kpi.is-warn { border-top-color: #c98a12; } .kpi.is-warn strong { color: #a8700a; }
+.kpi.is-bad { border-top-color: #c0392b; } .kpi.is-bad strong { color: #c0392b; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid-2 > div { min-width: 0; }
+table { width: 100%; border-collapse: collapse; }
+thead { display: table-header-group; } tfoot { display: table-row-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th { background: #0c2e42; color: #fff; font-weight: 700; padding: 5px 6px; text-align: start; white-space: nowrap; font-size: 10.5px; }
+td { padding: 4px 6px; border-bottom: 1px solid #e6ecf1; white-space: nowrap; }
+tbody tr:nth-child(even) td { background: #f5f8fa; }
+tfoot td { font-weight: 800; background: #e8f1f5; border-top: 2px solid #0c2e42; }
+table.compact td, table.compact th { padding: 4px 5px; }
+.n { text-align: end; } .strong { font-weight: 700; } .muted { color: #8595a2; } .bad { color: #c0392b; font-weight: 700; }
+.is-good { color: #1f8a5b; } .is-warn { color: #a8700a; } .is-bad { color: #c0392b; }
+.empty { text-align: center; color: #8595a2; padding: 10px; }
+.clip { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+.clip-s { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+tr.risk td { background: #fbeeec !important; }
+.meter { display: flex; align-items: center; gap: 5px; min-width: 100px; }
+.track { position: relative; flex: 1; height: 6px; background: #e3eaef; overflow: hidden; }
+.track i { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; background: #9aabb7; }
+.meter b { min-width: 42px; text-align: end; font-size: 10px; }
+.meter.is-good i { background: #1f8a5b; } .meter.is-warn i { background: #c98a12; } .meter.is-bad i { background: #c0392b; }
+footer.doc { margin-top: 10px; color: #8595a2; font-size: 9.5px; border-top: 1px solid #dfe6ec; padding-top: 5px; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header class="doc">
+    ${logo ? `<img src="${esc(logo)}" alt="">` : ""}
+    <div>
+        <h1>${esc(t.title)}${selection ? ` — ${esc(selection)}` : ""}</h1>
+        <p>${esc(company)}</p>
+    </div>
+    <dl>
+        <dt>${esc(t.period)}</dt><dd>${esc(periodLabel)}</dd>
+        <dt>${esc(t.branch)}</dt><dd>${esc(selection || t.allBranches)}</dd>
+        <dt>${esc(t.generated)}</dt><dd>${esc(fmtDay(new Date().toISOString().slice(0, 10)))}</dd>
+    </dl>
+</header>
+${selected.length || !selection ? body : `<p class="empty">${esc(t.noData)}</p>`}
+<footer class="doc"><span>${esc(company)}</span><span>${esc(t.note)}</span></footer>
+</body>
+</html>`;
+    }
+
+    /* ---------------- Excel ---------------- */
+
+    function exportExcel() {
+        const model = state.lastModel || buildModel();
+        const t = L();
+
+        if (!window.XLSX?.utils) {
+            utils.showToast("XLSX library is not loaded.", "error");
+            return;
+        }
+
+        const selection = state.selected;
+        const branches = selection ? model.branches.filter(b => key(b.name) === key(selection)) : model.branches;
+        const workbook = window.XLSX.utils.book_new();
+        const add = (name, rows) => {
+            if (!rows.length) return;
+            window.XLSX.utils.book_append_sheet(workbook, window.XLSX.utils.json_to_sheet(rows), name.slice(0, 31));
+        };
+
+        add("Summary", branches.map(b => ({
+            [t.branch]: b.name,
+            [t.sales]: Math.round(b.sales),
+            [t.target]: Math.round(b.target),
+            [t.achievement]: b.target > 0 ? +(b.sales / b.target * 100).toFixed(1) : "",
+            [t.collections]: Math.round(b.collections),
+            [t.due]: Math.round(b.due),
+            [t.overdue]: Math.round(b.overdue),
+            [t.invoices]: b.invoiceSet.size,
+            [t.activeCustomers]: b.customerSet.size,
+            ...(model.hasNew ? { [t.newCustomers]: b.newList.length } : {}),
+            ...(model.hasReactivated ? { [t.reactivated]: b.reactivatedList.length } : {}),
+            ...(model.hasVisits ? { [t.visits]: b.visits, [t.conversion]: b.visits ? +(b.visitInvoices / b.visits * 100).toFixed(1) : "" } : {})
+        })));
+
+        add("Salesmen", branches.flatMap(b => [...b.salesmen.values()]
+            .filter(s => s.sales || s.target || s.collections || s.due || s.overdue)
+            .map(s => ({
+                [t.branch]: b.name,
+                [t.code]: s.code,
+                [t.salesman]: s.name,
+                [t.target]: Math.round(s.target),
+                [t.sales]: Math.round(s.sales),
+                [t.achievement]: s.target > 0 ? +(s.sales / s.target * 100).toFixed(1) : "",
+                [t.collections]: Math.round(s.collections),
+                [t.due]: Math.round(s.due),
+                [t.overdue]: Math.round(s.overdue),
+                [t.invoices]: s.invoiceSet.size,
+                ...(model.hasVisits ? { [t.visits]: s.visits, [t.conversion]: s.visits ? +(s.visitInvoices / s.visits * 100).toFixed(1) : "" } : {})
+            }))));
+
+        add("Monthly", branches.flatMap(b => model.period.keys.map(monthKey => {
+            const m = b.months.get(monthKey) || { sales: 0, collections: 0, invoiceSet: new Set(), visits: 0 };
+            return {
+                [t.branch]: b.name,
+                [t.month]: monthKey,
+                [t.sales]: Math.round(m.sales),
+                [t.collections]: Math.round(m.collections),
+                [t.invoices]: m.invoiceSet.size,
+                ...(model.hasVisits ? { [t.visits]: m.visits } : {})
+            };
+        })));
+
+        add("Overdue Customers", branches.flatMap(b => [...b.overdueCustomers.values()]
+            .sort((x, y) => y.amount - x.amount)
+            .map(c => ({ [t.branch]: b.name, [t.customer]: c.label, [t.salesman]: c.salesman, [t.balance]: Math.round(c.amount), [t.days]: c.days }))));
+
+        add("Top Customers", branches.flatMap(b => [...b.customers.values()]
+            .sort((x, y) => y.amount - x.amount).slice(0, 50)
+            .map(c => ({ [t.branch]: b.name, [t.customer]: c.label, [t.invoices]: c.count.size, [t.sales]: Math.round(c.amount) }))));
+
+        if (model.hasNew) {
+            add("New Customers", branches.flatMap(b => b.newList.map(c => ({ [t.branch]: b.name, [t.customerCode]: c.code, [t.customer]: c.name, [t.salesman]: c.salesman, [t.date]: c.date }))));
+        }
+
+        if (model.hasReactivated) {
+            add("Reactivated", branches.flatMap(b => b.reactivatedList.map(c => ({ [t.branch]: b.name, [t.customerCode]: c.code, [t.customer]: c.name, [t.salesman]: c.salesman, [t.date]: c.date }))));
+        }
+
+        if (!workbook.SheetNames.length) {
+            utils.showToast(t.noData, "warning");
+            return;
+        }
+
+        window.XLSX.writeFile(workbook, `branch_report_${selection || "all"}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }
+
+    /* ---------------- UI ---------------- */
+
+    function render() {
+        const frame = utils.byId("branchReportFrame");
+        if (!frame) return;
+
+        const model = buildModel();
+        state.lastModel = model;
+        frame.srcdoc = buildDocument(model, state.selected);
+    }
+
+    function print() {
+        const frame = utils.byId("branchReportFrame");
+        const view = frame?.contentWindow;
+        if (!view) return;
+
+        const run = () => {
+            try {
+                view.focus();
+                view.print();
+            } catch (error) {
+                console.error(error);
+            }
+        };
+
+        const ready = frame.contentDocument?.fonts?.ready;
+        if (ready) ready.then(run).catch(run);
+        else run();
+    }
+
+    function close() {
+        utils.byId("branchReportModal")?.remove();
+    }
+
+    function open() {
+        const t = L();
+        close();
+
+        if (!state.data) {
+            utils.showToast(t.noData, "warning");
+            return;
+        }
+
+        const model = buildModel();
+        const filterBranch = clean(state.data?.filters?.branch);
+        state.selected = filterBranch && model.branches.some(b => key(b.name) === key(filterBranch))
+            ? model.branches.find(b => key(b.name) === key(filterBranch)).name
+            : "";
+
+        const modal = document.createElement("div");
+        modal.id = "branchReportModal";
+        modal.className = "report-preview-overlay";
+        modal.innerHTML = `
+            <section class="report-preview-card branch-report-card">
+                <header class="report-preview-header">
+                    <div>
+                        <h2>${esc(t.title)}</h2>
+                        <p>${esc(t.note)}</p>
+                    </div>
+                    <button type="button" class="icon-button" data-br="close" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </header>
+
+                <div class="report-preview-actions branch-report-actions">
+                    <label class="branch-report-select">
+                        <span>${esc(t.chooseBranch)}</span>
+                        <select id="branchReportSelect">
+                            <option value="">${esc(t.allBranches)}</option>
+                            ${model.branches.map(b => `<option value="${esc(b.name)}" ${key(b.name) === key(state.selected) ? "selected" : ""}>${esc(b.name)}</option>`).join("")}
+                        </select>
+                    </label>
+                    <span style="flex:1"></span>
+                    <button class="secondary-button" type="button" data-br="excel">
+                        <i class="fa-solid fa-file-excel"></i><span>${esc(t.excel)}</span>
+                    </button>
+                    <button class="primary-button" type="button" data-br="print">
+                        <i class="fa-solid fa-print"></i><span>${esc(t.print)}</span>
+                    </button>
+                </div>
+
+                <iframe id="branchReportFrame" class="branch-report-frame" title="${esc(t.title)}"></iframe>
+            </section>`;
+
+        document.body.appendChild(modal);
+
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                close();
+                return;
+            }
+
+            const action = event.target.closest("[data-br]")?.dataset.br;
+            if (action === "close") close();
+            if (action === "print") print();
+            if (action === "excel") exportExcel();
+        });
+
+        utils.byId("branchReportSelect")?.addEventListener("change", event => {
+            state.selected = event.target.value;
+            render();
+        });
+
+        document.addEventListener("keydown", function onKey(event) {
+            if (event.key === "Escape") {
+                close();
+                document.removeEventListener("keydown", onKey);
+            }
+        });
+
+        render();
+    }
+
+    function setData(data, balances) {
+        state.data = data || null;
+        state.balances = Array.isArray(balances) ? balances : (data?.dueOverdue || []);
+
+        if (utils.byId("branchReportModal")) {
+            render();
+        }
+    }
+
+    return Object.freeze({ open, close, setData, render, print, exportExcel });
+})();
+
+</script>
+<script>
 /* ===== app.js ===== */
 "use strict";
 
@@ -32697,6 +33813,13 @@ window.DashboardApp = (() => {
          */
         callModule(
             window.DashboardPresentation,
+            "setData",
+            data,
+            profileDueOverdue
+        );
+
+        callModule(
+            window.DashboardBranchReport,
             "setData",
             data,
             profileDueOverdue
