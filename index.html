@@ -19584,6 +19584,29 @@ window.DashboardProfiles = (() => {
         );
     }
 
+    /*
+     * عدد الفواتير الفعلي: شيت الفواتير ممكن يكون فيه صف لكل منتج،
+     * فنعد أرقام الفواتير المميزة بدل عدد الصفوف.
+     */
+    function uniqueInvoiceCount(rows) {
+        const invoiceNumbers = new Set();
+        let withoutNumber = 0;
+
+        (rows || []).forEach(row => {
+            const invoiceNo = normalizeCode(
+                getValue(row, ["invoiceNo", "invoiceNumber", "Invoice Number"], "")
+            );
+
+            if (invoiceNo) {
+                invoiceNumbers.add(invoiceNo);
+            } else {
+                withoutNumber += 1;
+            }
+        });
+
+        return invoiceNumbers.size + withoutNumber;
+    }
+
     function uniqueActivityCustomerCount(rows) {
         const keys = new Set();
         (Array.isArray(rows) ? rows : []).forEach(row => {
@@ -19714,11 +19737,11 @@ window.DashboardProfiles = (() => {
                 )
             },
             invoiceCount: {
-                current: currentInvoices.length,
-                previous: previousInvoices.length,
+                current: uniqueInvoiceCount(currentInvoices),
+                previous: uniqueInvoiceCount(previousInvoices),
                 growth: calculateGrowth(
-                    currentInvoices.length,
-                    previousInvoices.length
+                    uniqueInvoiceCount(currentInvoices),
+                    uniqueInvoiceCount(previousInvoices)
                 )
             }
         };
@@ -19767,7 +19790,7 @@ window.DashboardProfiles = (() => {
             collections.push(
                 utils.sumBy(monthCollections, getCollectionAmount)
             );
-            invoiceCounts.push(monthInvoices.length);
+            invoiceCounts.push(uniqueInvoiceCount(monthInvoices));
         }
 
         return { labels, sales, collections, invoiceCounts };
@@ -20032,7 +20055,7 @@ window.DashboardProfiles = (() => {
             overdue,
             achievement,
             invoiceCount:
-                invoices.length,
+                uniqueInvoiceCount(invoices),
             newCustomerCount:
                 uniqueActivityCustomerCount(newCustomers),
             reactivatedCustomerCount:
