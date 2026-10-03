@@ -12051,10 +12051,28 @@ window.DashboardDashboard = (() => {
         const totalOutstanding =
             totalDue + totalOverdue;
 
+        /* مبيعات الأكواد اللي لها هدف فقط (لا تشمل GM ومكاتب العملاء) */
+        const targetedSales =
+            window.DashboardTargets?.hasTargetForCode
+                ? utils.sumBy(
+                      invoices.filter(row =>
+                          window.DashboardTargets.hasTargetForCode(
+                              utils.firstValue(row, ["salesmanCode", "Salesman Code"], "")
+                          )
+                      ),
+                      row =>
+                          utils.firstValue(
+                              row,
+                              ["salesWithoutTax", "salesWithoutVat", "netSales", "sales"],
+                              0
+                          )
+                  )
+                : totalSalesWithoutTax;
+
         const targetAchievementPercent =
             selectedTarget > 0
                 ? (
-                    totalSalesWithoutTax /
+                    targetedSales /
                     selectedTarget
                 ) * 100
                 : 0;
@@ -12105,6 +12123,7 @@ window.DashboardDashboard = (() => {
             totalOverdue,
             totalOutstanding,
             selectedTarget,
+            targetedSales,
             targetAchievementPercent,
             collectionRatePercent,
             overdueRatePercent,
@@ -12183,10 +12202,16 @@ window.DashboardDashboard = (() => {
                     fallback.selectedTarget
                 ),
 
+            targetedSales:
+                utils.toNumber(
+                    fallback.targetedSales ??
+                    fallback.totalSalesWithoutTax
+                ),
+
             targetAchievementPercent:
                 utils.toNumber(
-                    serverSummary.targetAchievementPercent ??
-                    fallback.targetAchievementPercent
+                    fallback.targetAchievementPercent ??
+                    serverSummary.targetAchievementPercent
                 ),
 
             collectionRatePercent:
@@ -12395,7 +12420,7 @@ window.DashboardDashboard = (() => {
         const remainingTarget =
             Math.max(
                 summary.selectedTarget -
-                summary.totalSalesWithoutTax,
+                (summary.targetedSales ?? summary.totalSalesWithoutTax),
                 0
             );
 
@@ -17372,6 +17397,24 @@ window.DashboardTargets = (() => {
     }
 
     /*
+     * الإطارات: مبيعات الأكواد اللي ملهاش هدف في الفترة
+     * (زي 601 GM و 600C و 405 مكاتب العملاء) لا تدخل في
+     * حساب نسبة تحقيق الهدف للفرع أو للشركة.
+     */
+    function hasTargetForCode(code) {
+        const wanted = getSalesmanCodes(code);
+
+        if (!wanted.length) {
+            return false;
+        }
+
+        return targetRows.some(row =>
+            getSalesmanCodes(row).some(item => wanted.includes(item)) &&
+            getPeriodTarget(row, getQuarter(referenceDate)) > 0
+        );
+    }
+
+    /*
      * هدف الفترة المختارة لصف Target خام (يستخدمه ملف المندوب).
      */
     function getSelectedPeriodTarget(row) {
@@ -18533,7 +18576,7 @@ window.DashboardTargets = (() => {
                   noTarget: "بدون هدف",
                   total: "الإجمالي",
                   count: "المندوبين",
-                  note: "المبالغ بالريال السعودي، والمبيعات بدون ضريبة القيمة المضافة",
+                  note: "المبالغ بالريال السعودي، والمبيعات بدون ضريبة القيمة المضافة. مبيعات الأكواد بدون هدف لا تدخل في الإجمالي ونسبة التحقيق.",
                   fromTo: (from, to) => `من ${from} إلى ${to}`,
                   ofCount: (done, all) => `${done} من ${all}`
               }
@@ -18564,7 +18607,7 @@ window.DashboardTargets = (() => {
                   noTarget: "No target",
                   total: "Total",
                   count: "Salesmen",
-                  note: "Amounts in SAR. Sales exclude VAT.",
+                  note: "Amounts in SAR. Sales exclude VAT. Sales of codes without a target are excluded from totals and achievement.",
                   fromTo: (from, to) => `${from} to ${to}`,
                   ofCount: (done, all) => `${done} of ${all}`
               };
@@ -18616,7 +18659,10 @@ window.DashboardTargets = (() => {
         };
 
         const totalTarget = rows.reduce((sum, row) => sum + toNumber(row.monthlyTarget), 0);
-        const totalSales = rows.reduce((sum, row) => sum + toNumber(row.sales), 0);
+        /* المبيعات بدون هدف (GM ومكاتب العملاء) لا تدخل في الإجمالي ونسبة التحقيق */
+        const totalSales = rows
+            .filter(row => toNumber(row.monthlyTarget) > 0)
+            .reduce((sum, row) => sum + toNumber(row.sales), 0);
         const totalAchievement = totalTarget > 0 ? (totalSales / totalTarget) * 100 : 0;
         const withTarget = rows.filter(row => toNumber(row.monthlyTarget) > 0);
         const achievedRows = withTarget.filter(row => row.achieved);
@@ -18632,7 +18678,10 @@ window.DashboardTargets = (() => {
             const entry = branches.get(name) || { name, target: 0, sales: 0, count: 0, achieved: 0 };
 
             entry.target += toNumber(row.monthlyTarget);
-            entry.sales += toNumber(row.sales);
+
+            if (toNumber(row.monthlyTarget) > 0) {
+                entry.sales += toNumber(row.sales);
+            }
             entry.count += 1;
 
             if (row.achieved) entry.achieved += 1;
@@ -18878,6 +18927,7 @@ ${branchRows.length > 1 ? `
     ===================================================== */
 
     return Object.freeze({
+        hasTargetForCode,
         getSelectedPeriodTarget,
         exportPdf,
         initialize,
@@ -30181,6 +30231,7 @@ window.DashboardPresentation = (() => {
         return {
             name,
             sales: 0,
+            targetSales: 0,
             target: 0,
             collections: 0,
             outstanding: 0,
@@ -30270,6 +30321,7 @@ window.DashboardPresentation = (() => {
                     name: clean(name) || key,
                     branch: clean(branch) || unassigned,
                     sales: 0,
+                    targetSales: 0,
                     target: 0,
                     collections: 0,
                     outstanding: 0,
@@ -30320,6 +30372,13 @@ window.DashboardPresentation = (() => {
 
             const invoiceSalesman = salesmanOf(row.salesmanCode, row.salesmanName, row.branch);
             invoiceSalesman.sales += amount;
+
+            /* مبيعات الأكواد اللي لها هدف فقط تدخل في نسبة التحقيق */
+            if (window.DashboardTargets?.hasTargetForCode?.(row.salesmanCode) ?? true) {
+                invoiceSalesman.targetSales += amount;
+                branchOf(row.branch).targetSales += amount;
+                company.targetSales += amount;
+            }
 
             const invoiceMonth = String(row.invoiceDate || "").slice(0, 7);
 
@@ -30498,15 +30557,15 @@ window.DashboardPresentation = (() => {
 
         if (withTarget.length) {
             const ranked = [...withTarget].sort(
-                (a, b) => ratio(b.sales, b.target) - ratio(a.sales, a.target)
+                (a, b) => ratio(b.targetSales, b.target) - ratio(a.targetSales, a.target)
             );
             const best = ranked[0];
             const worst = ranked[ranked.length - 1];
 
-            items.push(tx("hlTopAchiever", { branch: best.name, pct: fmtPct(ratio(best.sales, best.target)) }));
+            items.push(tx("hlTopAchiever", { branch: best.name, pct: fmtPct(ratio(best.targetSales, best.target)) }));
 
             if (worst !== best) {
-                items.push(tx("hlLowAchiever", { branch: worst.name, pct: fmtPct(ratio(worst.sales, worst.target)) }));
+                items.push(tx("hlLowAchiever", { branch: worst.name, pct: fmtPct(ratio(worst.targetSales, worst.target)) }));
             }
         }
 
@@ -30529,13 +30588,13 @@ window.DashboardPresentation = (() => {
 
         const topSalesman = model.salesmen
             .filter(salesman => salesman.target > 0)
-            .sort((a, b) => ratio(b.sales, b.target) - ratio(a.sales, a.target))[0];
+            .sort((a, b) => ratio(b.targetSales, b.target) - ratio(a.targetSales, a.target))[0];
 
         if (topSalesman) {
             items.push(tx("hlSalesman", {
                 name: topSalesman.name,
                 branch: topSalesman.branch,
-                pct: fmtPct(ratio(topSalesman.sales, topSalesman.target))
+                pct: fmtPct(ratio(topSalesman.targetSales, topSalesman.target))
             }));
         }
 
@@ -30589,7 +30648,7 @@ window.DashboardPresentation = (() => {
 
     function overviewSlide(model) {
         const company = model.company;
-        const achievement = ratio(company.sales, company.target);
+        const achievement = ratio(company.targetSales, company.target);
         const collectionRate = ratio(company.collections, company.sales);
         const overdueShare = ratio(company.overdue, company.outstanding);
 
@@ -30614,7 +30673,7 @@ window.DashboardPresentation = (() => {
                 <div class="pz-kpis" style="--cols:4">
                     ${kpi(tx("sales"), fmtCompact(company.sales), "SAR " + fmtInt(company.sales))}
                     ${kpi(tx("target"), fmtCompact(company.target), "SAR " + fmtInt(company.target))}
-                    ${kpi(tx("achievement"), fmtPct(achievement), targetGap(company.sales, company.target), achievementTone(achievement))}
+                    ${kpi(tx("achievement"), fmtPct(achievement), targetGap(company.targetSales, company.target), achievementTone(achievement))}
                     ${kpi(tx("collections"), fmtCompact(company.collections), "SAR " + fmtInt(company.collections))}
                     ${kpi(tx("collectionRate"), fmtPct(collectionRate), tx("ofSales"))}
                     ${kpi(tx("outstanding"), fmtCompact(company.outstanding), tx("notDueValue", { value: fmtInt(company.due) }))}
@@ -30640,7 +30699,7 @@ window.DashboardPresentation = (() => {
 
     function comparisonSlide(model) {
         const row = branch => {
-            const achievement = ratio(branch.sales, branch.target);
+            const achievement = ratio(branch.targetSales, branch.target);
             const overdueShare = ratio(branch.overdue, branch.outstanding);
 
             return `
@@ -30692,7 +30751,7 @@ window.DashboardPresentation = (() => {
         const maxSales = Math.max(1, ...branches.map(branch => Math.max(branch.sales, branch.target)));
 
         const salesBars = branches.map(branch => {
-            const achievement = ratio(branch.sales, branch.target);
+            const achievement = ratio(branch.targetSales, branch.target);
 
             return `
                 <div class="pz-bar-row">
@@ -30756,7 +30815,7 @@ window.DashboardPresentation = (() => {
         const ranked = [
             ...model.salesmen
                 .filter(salesman => salesman.target > 0)
-                .sort((a, b) => ratio(b.sales, b.target) - ratio(a.sales, a.target)),
+                .sort((a, b) => ratio(b.targetSales, b.target) - ratio(a.targetSales, a.target)),
             ...model.salesmen
                 .filter(salesman => !(salesman.target > 0))
                 .sort((a, b) => b.sales - a.sales)
@@ -30794,7 +30853,7 @@ window.DashboardPresentation = (() => {
                                 <td>${esc(salesman.branch)}</td>
                                 <td class="n">${fmtInt(salesman.sales)}</td>
                                 <td class="n">${salesman.target > 0 ? fmtInt(salesman.target) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
-                                <td>${meter(ratio(salesman.sales, salesman.target))}</td>
+                                <td>${meter(ratio(salesman.targetSales, salesman.target))}</td>
                                 <td class="n">${fmtInt(salesman.collections)}</td>
                                 ${model.hasVisits
                                     ? `<td class="n">${salesman.visits ? fmtInt(salesman.visits) : "—"}</td><td class="n pz-strong">${fmtPct(salesman.conversion)}</td>`
@@ -30807,7 +30866,7 @@ window.DashboardPresentation = (() => {
     }
 
     function branchSlide(model, branch, rank) {
-        const achievement = ratio(branch.sales, branch.target);
+        const achievement = ratio(branch.targetSales, branch.target);
         const overdueShare = ratio(branch.overdue, branch.outstanding);
 
         const salesmen = model.salesmen
@@ -30829,7 +30888,7 @@ window.DashboardPresentation = (() => {
                 <div class="pz-kpis is-compact" style="--cols:6">
                     ${kpi(tx("sales"), fmtCompact(branch.sales), "SAR " + fmtInt(branch.sales))}
                     ${kpi(tx("target"), branch.target > 0 ? fmtCompact(branch.target) : "—", branch.target > 0 ? "SAR " + fmtInt(branch.target) : "")}
-                    ${kpi(tx("achievement"), fmtPct(achievement), targetGap(branch.sales, branch.target, fmtCompact), achievementTone(achievement))}
+                    ${kpi(tx("achievement"), fmtPct(achievement), targetGap(branch.targetSales, branch.target, fmtCompact), achievementTone(achievement))}
                     ${kpi(tx("collections"), fmtCompact(branch.collections), tx("collectionRate") + " " + fmtPct(ratio(branch.collections, branch.sales)))}
                     ${kpi(tx("outstanding"), fmtCompact(branch.outstanding), tx("notDueValue", { value: fmtCompact(branch.due) }))}
                     ${kpi(tx("overdue"), fmtCompact(branch.overdue), tx("overdueShare") + " " + fmtPct(overdueShare), overdueTone(overdueShare))}
@@ -30854,7 +30913,7 @@ window.DashboardPresentation = (() => {
                                         <tr>
                                             <td class="pz-strong" style="--clip:${model.hasVisits ? 130 : 170}px">${clip(salesman.name)}</td>
                                             <td class="n">${fmtInt(salesman.sales)}</td>
-                                            <td>${salesman.target > 0 ? meter(ratio(salesman.sales, salesman.target)) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
+                                            <td>${salesman.target > 0 ? meter(ratio(salesman.targetSales, salesman.target)) : `<span class="pz-muted">${esc(tx("noTarget"))}</span>`}</td>
                                             <td class="n">${fmtInt(salesman.collections)}</td>
                                             ${model.hasVisits ? `<td class="n">${fmtPct(salesman.conversion)}</td>` : ""}
                                             <td class="n">${fmtInt(salesman.overdue)}</td>
@@ -32056,6 +32115,7 @@ window.DashboardBranchReport = (() => {
         return {
             name,
             sales: 0,
+            targetSales: 0,
             target: 0,
             collections: 0,
             due: 0,
@@ -32102,6 +32162,7 @@ window.DashboardBranchReport = (() => {
                     name: clean(name) || salesmanKey,
                     target: 0,
                     sales: 0,
+                    targetSales: 0,
                     collections: 0,
                     due: 0,
                     overdue: 0,
@@ -32159,6 +32220,13 @@ window.DashboardBranchReport = (() => {
 
             const salesman = getSalesman(branch, salesmanCodeOf(row), row.salesmanName);
             salesman.sales += amount;
+
+            /* مبيعات الأكواد اللي لها هدف فقط تدخل في نسبة التحقيق */
+            if (window.DashboardTargets?.hasTargetForCode?.(row.salesmanCode) ?? true) {
+                salesman.targetSales += amount;
+                branch.targetSales += amount;
+                company.targetSales += amount;
+            }
 
             if (invoiceNo) {
                 salesman.invoiceSet.add(invoiceNo);
@@ -32316,7 +32384,7 @@ window.DashboardBranchReport = (() => {
 
     function kpiGrid(branch, model) {
         const t = L();
-        const achievement = ratio(branch.sales, branch.target);
+        const achievement = ratio(branch.targetSales, branch.target);
         const overdueShare = ratio(branch.overdue, branch.due + branch.overdue);
         const invoices = branch.invoiceSet.size;
 
@@ -32324,7 +32392,7 @@ window.DashboardBranchReport = (() => {
             [t.sales, money(branch.sales)],
             [t.target, branch.target > 0 ? money(branch.target) : "—"],
             [t.achievement, pct(achievement), tone(achievement)],
-            [t.remaining, branch.target > 0 ? money(Math.max(branch.target - branch.sales, 0)) : "—"],
+            [t.remaining, branch.target > 0 ? money(Math.max(branch.target - branch.targetSales, 0)) : "—"],
             [t.collections, money(branch.collections)],
             [t.collectionRate, pct(ratio(branch.collections, branch.sales))],
             [t.outstanding, money(branch.due + branch.overdue)],
@@ -32368,7 +32436,7 @@ window.DashboardBranchReport = (() => {
                 <td class="strong">${esc(s.name)}</td>
                 <td class="n">${s.target > 0 ? money(s.target) : `<span class="muted">${esc(t.noTarget)}</span>`}</td>
                 <td class="n">${money(s.sales)}</td>
-                <td>${s.target > 0 ? meter(ratio(s.sales, s.target)) : "—"}</td>
+                <td>${s.target > 0 ? meter(ratio(s.targetSales, s.target)) : "—"}</td>
                 <td class="n">${money(s.collections)}</td>
                 <td class="n">${money(s.due)}</td>
                 <td class="n">${money(s.overdue)}</td>
@@ -32491,7 +32559,7 @@ window.DashboardBranchReport = (() => {
         const t = L();
 
         const rows = model.branches.map(b => {
-            const achievement = ratio(b.sales, b.target);
+            const achievement = ratio(b.targetSales, b.target);
             const overdueShare = ratio(b.overdue, b.due + b.overdue);
             return `
                 <tr>
@@ -32643,7 +32711,7 @@ ${selected.length || !selection ? body : `<p class="empty">${esc(t.noData)}</p>`
             [t.branch]: b.name,
             [t.sales]: Math.round(b.sales),
             [t.target]: Math.round(b.target),
-            [t.achievement]: b.target > 0 ? +(b.sales / b.target * 100).toFixed(1) : "",
+            [t.achievement]: b.target > 0 ? +(b.targetSales / b.target * 100).toFixed(1) : "",
             [t.collections]: Math.round(b.collections),
             [t.due]: Math.round(b.due),
             [t.overdue]: Math.round(b.overdue),
