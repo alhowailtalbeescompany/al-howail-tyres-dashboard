@@ -5402,8 +5402,8 @@ body.visits-disabled [data-visits-feature] {
                         <article class="kpi-card">
 
                             <div class="kpi-card-header">
-                                <span data-i18n="dashboard.monthlyTarget">
-                                    الهدف الشهري
+                                <span data-i18n="dashboard.monthlyTarget" id="dashboardTargetLabel">
+                                    هدف الفترة
                                 </span>
 
                                 <div class="kpi-icon">
@@ -7671,7 +7671,8 @@ const TRANSLATIONS = {
             due: "المستحقات",
             overdue: "المتأخرات",
             outstanding: "الرصيد القائم",
-            monthlyTarget: "الهدف الشهري",
+            monthlyTarget: "هدف الفترة",
+            annualTarget: "الهدف السنوي",
             achievement: "تحقيق الهدف",
             remainingTarget: "المتبقي من الهدف",
             averageInvoice: "متوسط الفاتورة",
@@ -8062,7 +8063,8 @@ const TRANSLATIONS = {
             due: "Due",
             overdue: "Overdue",
             outstanding: "Outstanding Balance",
-            monthlyTarget: "Monthly Target",
+            monthlyTarget: "Period Target",
+            annualTarget: "Annual Target",
             achievement: "Target Achievement",
             remainingTarget: "Remaining Target",
             averageInvoice: "Average Invoice",
@@ -12435,8 +12437,8 @@ window.DashboardDashboard = (() => {
 
             selectedTarget:
                 utils.toNumber(
-                    serverSummary.selectedTarget ??
-                    fallback.selectedTarget
+                    fallback.selectedTarget ??
+                    serverSummary.selectedTarget
                 ),
 
             targetedSales:
@@ -12554,10 +12556,9 @@ window.DashboardDashboard = (() => {
                 dateTo || dateFrom
             );
 
+        /* بدون فترة: هدف السنة كاملة (12 شهر) */
         if (!from && !to) {
-            return [
-                new Date().getMonth() + 1
-            ];
+            return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         }
 
         const start =
@@ -12646,6 +12647,17 @@ window.DashboardDashboard = (() => {
     ===================================================== */
 
     function renderKPIs(summary) {
+        const noPeriodSelected =
+            !utils.byId("fromDateFilter")?.value &&
+            !utils.byId("toDateFilter")?.value;
+
+        utils.setText(
+            "dashboardTargetLabel",
+            noPeriodSelected
+                ? utils.t("dashboard.annualTarget", "الهدف السنوي")
+                : utils.t("dashboard.monthlyTarget", "هدف الفترة")
+        );
+
         const averageInvoice =
             summary.invoiceCount > 0
                 ? (
@@ -17591,10 +17603,11 @@ window.DashboardTargets = (() => {
         let from = toIsoDateText(dateFrom);
         let to = toIsoDateText(dateTo);
 
+        /* بدون فترة: السنة الحالية كاملة */
         if (!from && !to) {
-            periodRange = null;
-            render();
-            return null;
+            const year = new Date().getFullYear();
+            from = `${year}-01-01`;
+            to = `${year}-12-31`;
         }
 
         from = from || to;
@@ -30040,7 +30053,7 @@ window.DashboardPresentation = (() => {
             preparedBy: "إعداد",
             period: "الفترة",
             scope: "النطاق",
-            periodAll: "كل البيانات المتاحة",
+            periodAll: "السنة كاملة",
             periodFromTo: "من {from} إلى {to}",
             scopeAll: "جميع الفروع",
             scopeBranch: "فرع {branch}",
@@ -30130,7 +30143,7 @@ window.DashboardPresentation = (() => {
             preparedBy: "Prepared by",
             period: "Period",
             scope: "Scope",
-            periodAll: "All available data",
+            periodAll: "Full year",
             periodFromTo: "{from} to {to}",
             scopeAll: "All branches",
             scopeBranch: "{branch} branch",
@@ -30376,17 +30389,12 @@ window.DashboardPresentation = (() => {
         let to = clean(filters?.dateTo);
         let derived = false;
 
+        /* بدون فترة: السنة الحالية كاملة */
         if (!from && !to) {
-            const dates = invoices
-                .map(row => String(row.invoiceDate || "").slice(0, 10))
-                .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value))
-                .sort();
-
-            if (dates.length) {
-                from = dates[0];
-                to = dates[dates.length - 1];
-                derived = true;
-            }
+            const year = new Date().getFullYear();
+            from = `${year}-01-01`;
+            to = `${year}-12-31`;
+            derived = true;
         }
 
         if (!from && !to) {
