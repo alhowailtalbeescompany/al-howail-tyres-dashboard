@@ -7338,6 +7338,18 @@ table.mix-table {
                                 </span>
                             </button>
 
+                            <button
+                                class="report-card"
+                                type="button"
+                                data-report="monthly"
+                            >
+                                <i class="fa-solid fa-calendar-days"></i>
+
+                                <span data-i18n="reports.monthlyReport">
+                                    التقرير الشهري
+                                </span>
+                            </button>
+
                         </div>
 
                     </article>
@@ -8132,6 +8144,7 @@ const TRANSLATIONS = {
             salesmanReport: "تقرير المندوب",
             branchReport: "تقرير الفرع",
             upcomingCollectionsReport: "تقرير التحصيلات القادمة",
+            monthlyReport: "التقرير الشهري",
             totalBalanceDue: "إجمالي المبالغ المطلوب تحصيلها",
             dueTodayCount: "مستحق اليوم",
             next7DaysCount: "خلال 7 أيام",
@@ -8542,6 +8555,7 @@ const TRANSLATIONS = {
             salesmanReport: "Salesman Report",
             branchReport: "Branch Report",
             upcomingCollectionsReport: "Upcoming Collections Report",
+            monthlyReport: "Monthly Report",
             totalBalanceDue: "Total Balance Due",
             dueTodayCount: "Due Today",
             next7DaysCount: "Within 7 Days",
@@ -28767,6 +28781,12 @@ window.DashboardReports = (() => {
     }
 
     function runReport(type) {
+        /* التقرير الشهري */
+        if (type === "monthly" && window.DashboardMonthlyReport) {
+            window.DashboardMonthlyReport.open();
+            return true;
+        }
+
         /* تقرير الفرع الشامل */
         if (type === "branch" && window.DashboardBranchReport) {
             window.DashboardBranchReport.open();
@@ -34141,6 +34161,877 @@ window.DashboardForecast = (() => {
     }
 
     return Object.freeze({ compute, forSalesman, render, renderDashboard, renderTargetsTable });
+})();
+
+</script>
+<script>
+/* ===== monthly-report.js ===== */
+"use strict";
+
+/* =========================================================
+   التقرير الشهري (جوه الداشبورد)
+   - اختيار الشهر: الشهر الحالي = من يوم 1 لحد آخر بيانات،
+     والشهور اللي فاتت = الشهر كامل (نهائي).
+   - النطاق: التقرير المجمع + فرع لكل صفحة، أو فرع واحد.
+   - طباعة / PDF، تصدير Excel، ونسخ موضوع ونص الإيميل بالإنجليزي.
+   - التحقيق: مبيعات الأكواد اللي ليها هدف بس.
+========================================================= */
+
+window.DashboardMonthlyReport = (() => {
+    const utils = window.DashboardUtils;
+
+    const TEXT = {
+        ar: {
+            title: "التقرير الشهري",
+            subtitle: "تقرير الشهر للمجمع وكل فرع، جاهز للطباعة والإرسال",
+            month: "الشهر",
+            scope: "التقرير",
+            all: "المجمع + كل الفروع",
+            consolidatedOnly: "المجمع فقط",
+            print: "طباعة / PDF",
+            excel: "تصدير Excel",
+            copySubject: "نسخ موضوع الإيميل",
+            copyBody: "نسخ نص الإيميل",
+            copied: "اتنسخ — الصقه في الإيميل",
+            final: "نهائي",
+            mtd: "حتى الآن",
+            consolidated: "التقرير المجمع — كل الفروع",
+            branchReport: "تقرير فرع",
+            period: "الفترة",
+            fullMonth: "الشهر كامل",
+            daysPassed: (a, b) => `مرّ ${a} من ${b} يوم عمل`,
+            kpis: "المؤشرات الرئيسية",
+            sales: "المبيعات",
+            salesMtd: "المبيعات حتى الآن",
+            target: "هدف الشهر",
+            achieved: "التحقيق",
+            achievedFinal: "التحقيق النهائي",
+            achievedMtd: "التحقيق حتى الآن",
+            remaining: "المتبقي للهدف",
+            forecast: "توقع نهاية الشهر",
+            forecastPct: "التحقيق المتوقع",
+            collections: "التحصيلات",
+            invoices: "عدد الفواتير",
+            overdue: "المتأخرات (الرصيد الحالي)",
+            due: "المستحق (غير متأخر)",
+            upcoming7: "مستحق خلال 7 أيام",
+            untargeted: "مبيعات الأكواد الأخرى",
+            otherCodes: "مبيعات الأكواد الأخرى (بدون هدف — لا تدخل في التحقيق)",
+            otherSales: "أكواد أخرى",
+            code: "الكود",
+            branches: "الفروع",
+            branch: "الفرع",
+            salesmen: "المندوبين",
+            branchSalesmen: "مندوبين الفرع",
+            salesman: "المندوب",
+            noTarget: "بدون هدف",
+            groups: "المبيعات حسب مجموعة المنتج",
+            group: "المجموعة",
+            qty: "الكمية",
+            value: "القيمة",
+            avg: "متوسط سعر القطعة",
+            topOverdue: "أعلى 10 عملاء متأخرات (الرصيد الحالي)",
+            customer: "العميل",
+            balance: "الرصيد",
+            days: "أيام التأخير",
+            upcoming: (n, v) => `تحصيلات مستحقة خلال 7 أيام (${n} فاتورة • ${v})`,
+            dueDate: "تاريخ الاستحقاق",
+            daysLeft: "باقي (يوم)",
+            amount: "المبلغ",
+            unassigned: "غير محدد",
+            none: "لا توجد بيانات",
+            note: closed =>
+                "المبالغ بالريال السعودي بدون ضريبة. المبيعات والتحقيق يحسبوا الأكواد اللي ليها هدف بس. " +
+                (closed ? "" : "التوقع = المعدل اليومي حتى الآن × أيام عمل الشهر (بدون الجمعة). ") +
+                "المديونية بالرصيد الحالي."
+        },
+        en: {
+            title: "Monthly Report",
+            subtitle: "Month report for the company and each branch, ready to print and send",
+            month: "Month",
+            scope: "Report",
+            all: "Consolidated + all branches",
+            consolidatedOnly: "Consolidated only",
+            print: "Print / PDF",
+            excel: "Export Excel",
+            copySubject: "Copy email subject",
+            copyBody: "Copy email body",
+            copied: "Copied — paste it into your email",
+            final: "Final",
+            mtd: "Month to date",
+            consolidated: "Consolidated Report — All Branches",
+            branchReport: "Branch Report",
+            period: "Period",
+            fullMonth: "Full month",
+            daysPassed: (a, b) => `${a} of ${b} working days`,
+            kpis: "Key figures",
+            sales: "Sales",
+            salesMtd: "Sales so far",
+            target: "Month target",
+            achieved: "Achieved",
+            achievedFinal: "Final achievement",
+            achievedMtd: "Achieved so far",
+            remaining: "Remaining to target",
+            forecast: "Month-end forecast",
+            forecastPct: "Forecast achievement",
+            collections: "Collections",
+            invoices: "Invoices",
+            overdue: "Overdue (current balance)",
+            due: "Due (not overdue)",
+            upcoming7: "Due within 7 days",
+            untargeted: "Other codes sales",
+            otherCodes: "Other codes sales (no target — excluded from achievement)",
+            otherSales: "Other codes",
+            code: "Code",
+            branches: "Branches",
+            branch: "Branch",
+            salesmen: "Salesmen",
+            branchSalesmen: "Branch salesmen",
+            salesman: "Salesman",
+            noTarget: "No target",
+            groups: "Sales by product group",
+            group: "Group",
+            qty: "Qty",
+            value: "Value",
+            avg: "Avg price / piece",
+            topOverdue: "Top 10 overdue customers (current balance)",
+            customer: "Customer",
+            balance: "Balance",
+            days: "Days late",
+            upcoming: (n, v) => `Collections due within 7 days (${n} invoices • ${v})`,
+            dueDate: "Due date",
+            daysLeft: "Days left",
+            amount: "Amount",
+            unassigned: "Unassigned",
+            none: "No data",
+            note: closed =>
+                "Amounts in SAR excluding VAT. Sales and achievement include codes with a target only. " +
+                (closed ? "" : "Forecast = current daily rate × working days in the month (Fridays excluded). ") +
+                "Receivables show the current balance."
+        }
+    };
+
+    const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+    const state = { monthKey: "", scope: "all", data: null };
+
+    const lang = () => (utils.getLanguage() === "en" ? "en" : "ar");
+    const T = () => TEXT[lang()];
+    const esc = value => utils.escapeHTML(value == null ? "" : String(value));
+    const num = value => utils.toNumber(value);
+    const clean = value => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    const money = value => new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(num(value)));
+    const pct = value => (value == null || !isFinite(value) ? "—" : `${value.toFixed(1)}%`);
+    const tone = value => (value == null ? "is-none" : value >= 100 ? "is-good" : value >= 80 ? "is-warn" : "is-bad");
+    const pad = value => String(value).padStart(2, "0");
+
+    const todayIso = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    };
+
+    const dayLabel = iso => {
+        const [y, m, d] = String(iso).split("-");
+        return y && m && d ? `${d} ${MONTHS_SHORT[Number(m) - 1]} ${y}` : String(iso || "");
+    };
+
+    const monthName = (monthKey, language = lang()) => {
+        const [y, m] = monthKey.split("-").map(Number);
+        return `${(language === "en" ? MONTHS_EN : MONTHS_AR)[m - 1]} ${y}`;
+    };
+
+    function raw() {
+        return window.DashboardApp?.getState?.()?.rawData || {};
+    }
+
+    function splitCodes(value) {
+        return clean(value).split(/\s*(?:\+|,|\/|&)\s*/).map(clean).filter(Boolean);
+    }
+
+    function monthTarget(row, monthNumber) {
+        const quarter = Math.floor((monthNumber - 1) / 3) + 1;
+        const monthly = num(row[`monthlyTargetQ${quarter}`]);
+        if (monthly > 0) return monthly;
+        const quarterly = num(row[`targetQ${quarter}`]);
+        return quarterly > 0 ? quarterly / 3 : 0;
+    }
+
+    function availableMonths() {
+        const months = new Set([todayIso().slice(0, 7)]);
+        (raw().invoices || []).forEach(row => {
+            const key = String(row.invoiceDate || "").slice(0, 7);
+            if (/^\d{4}-\d{2}$/.test(key)) months.add(key);
+        });
+        return [...months].sort().reverse();
+    }
+
+    /* =====================================================
+       بناء بيانات الشهر
+    ===================================================== */
+
+    function newScope(name) {
+        return {
+            name, sales: 0, targetedSales: 0, collections: 0, invoiceSet: new Set(),
+            target: 0, overdue: 0, due: 0, upcoming: [], overdueCustomers: new Map(), invoiceRows: [],
+            otherCodes: new Map()
+        };
+    }
+
+    function build(monthKey) {
+        const t = T();
+        const data = raw();
+        const [year, monthNumber] = monthKey.split("-").map(Number);
+        const lastDay = new Date(year, monthNumber, 0).getDate();
+        const start = `${monthKey}-01`;
+        const monthEnd = `${monthKey}-${pad(lastDay)}`;
+        const today = todayIso();
+        const closed = monthEnd < today;
+
+        const monthInvoices = (data.invoices || []).filter(row => String(row.invoiceDate || "").slice(0, 7) === monthKey);
+        const latest = monthInvoices.map(row => String(row.invoiceDate).slice(0, 10)).sort().pop();
+        const end = closed ? monthEnd : (latest && latest < today ? latest : (today < monthEnd ? today : monthEnd));
+
+        const company = newScope(t.consolidated);
+        const branches = new Map();
+        const salesmen = new Map();
+
+        const branchOf = name => {
+            const key = clean(name) || t.unassigned;
+            if (!branches.has(key)) branches.set(key, newScope(key));
+            return branches.get(key);
+        };
+
+        const scopesFor = row => [company, branchOf(row.branch)];
+
+        const targetedCodes = new Set();
+        const targetBranches = new Set();
+
+        (data.target || []).forEach(row => {
+            const target = monthTarget(row, monthNumber);
+            if (target > 0) splitCodes(row.salesmanCode).concat(clean(row.salesmanCode)).forEach(code => targetedCodes.add(code));
+            targetBranches.add(clean(row.branch) || t.unassigned);
+            scopesFor(row).forEach(scope => { scope.target += target; });
+
+            salesmen.set(clean(row.salesmanCode), {
+                code: clean(row.salesmanCode),
+                codes: splitCodes(row.salesmanCode),
+                name: clean(row.salesmanName) || clean(row.salesmanCode),
+                branch: clean(row.branch) || t.unassigned,
+                target,
+                sales: 0,
+                overdue: 0
+            });
+        });
+
+        const isTargeted = code => splitCodes(code).concat(clean(code)).some(item => targetedCodes.has(item));
+
+        const salesmanOf = code => {
+            const cleanCode = clean(code);
+            if (salesmen.has(cleanCode)) return salesmen.get(cleanCode);
+            const parts = splitCodes(cleanCode);
+            return [...salesmen.values()].find(s => s.codes.some(c => parts.includes(c))) || null;
+        };
+
+        monthInvoices.forEach(row => {
+            const date = String(row.invoiceDate).slice(0, 10);
+            if (date < start || date > end) return;
+
+            const amount = num(row.salesWithoutTax);
+            const targeted = isTargeted(row.salesmanCode);
+
+            const otherKey = clean(row.salesmanCode) || "—";
+            const otherName = salesmanOf(row.salesmanCode)?.name || clean(row.salesmanName) || otherKey;
+
+            scopesFor(row).forEach(scope => {
+                scope.sales += amount;
+                if (targeted) scope.targetedSales += amount;
+                if (!targeted) {
+                    const entry = scope.otherCodes.get(otherKey) || { code: otherKey, name: otherName, branch: clean(row.branch), sales: 0, invoices: new Set() };
+                    entry.sales += amount;
+                    if (row.invoiceNo) entry.invoices.add(clean(row.invoiceNo));
+                    scope.otherCodes.set(otherKey, entry);
+                }
+                if (row.invoiceNo) scope.invoiceSet.add(clean(row.invoiceNo));
+                scope.invoiceRows.push(row);
+            });
+
+            const salesman = salesmanOf(row.salesmanCode);
+            if (salesman) salesman.sales += amount;
+        });
+
+        (data.collections || []).forEach(row => {
+            const date = String(row.collectionDate || "").slice(0, 10);
+            if (date < start || date > end) return;
+            const amount = num(row.collectionAmount);
+            scopesFor(row).forEach(scope => { scope.collections += amount; });
+        });
+
+        (data.dueOverdue || []).forEach(row => {
+            const amount = num(row.invoiceBalance);
+            const isOverdue = String(row.status || "").toLowerCase() === "overdue";
+            const remaining = num(row.daysRemainingToCollect ?? row.daysUntilDue);
+
+            scopesFor(row).forEach(scope => {
+                if (isOverdue) {
+                    scope.overdue += amount;
+                    const key = clean(row.customerCode) || clean(row.customerName);
+                    const entry = scope.overdueCustomers.get(key) || { name: clean(row.customerName), salesman: clean(row.salesmanName), branch: clean(row.branch), amount: 0, days: 0 };
+                    entry.amount += amount;
+                    entry.days = Math.max(entry.days, num(row.overdueDays));
+                    scope.overdueCustomers.set(key, entry);
+                } else {
+                    scope.due += amount;
+                    if (amount > 0 && remaining >= 0 && remaining <= 7) {
+                        scope.upcoming.push({ name: clean(row.customerName), salesman: clean(row.salesmanName), dueDate: row.dueDate || "", remaining, amount });
+                    }
+                }
+            });
+
+            const salesman = salesmanOf(row.salesmanCode);
+            if (salesman && isOverdue) salesman.overdue += amount;
+        });
+
+        const workingDays = (from, to) => {
+            let count = 0;
+            for (let day = from; day <= to; day += 1) {
+                if (new Date(year, monthNumber - 1, day).getDay() !== 5) count += 1;
+            }
+            return count;
+        };
+
+        const totalDays = workingDays(1, lastDay);
+        const elapsed = closed ? totalDays : Math.max(workingDays(1, Number(end.slice(8, 10))), 1);
+
+        const project = (sales, target) => {
+            const forecast = closed ? sales : (sales / elapsed) * totalDays;
+            return {
+                achievedPct: target > 0 ? (sales / target) * 100 : null,
+                forecast,
+                forecastPct: target > 0 ? (forecast / target) * 100 : null,
+                remaining: Math.max(target - sales, 0)
+            };
+        };
+
+        const finalize = (scope, isCompany) => ({
+            ...scope,
+            ...project(scope.targetedSales, scope.target),
+            untargetedSales: scope.sales - scope.targetedSales,
+            invoiceCount: scope.invoiceSet.size,
+            mix: window.DashboardProductMix ? window.DashboardProductMix.summarize(scope.invoiceRows) : null,
+            topOverdue: [...scope.overdueCustomers.values()].sort((a, b) => b.amount - a.amount).slice(0, 10),
+            upcoming: [...scope.upcoming].sort((a, b) => a.remaining - b.remaining || b.amount - a.amount),
+            upcomingTotal: scope.upcoming.reduce((sum, item) => sum + item.amount, 0),
+            otherCodeList: [...scope.otherCodes.values()]
+                .map(entry => ({ ...entry, invoiceCount: entry.invoices.size }))
+                .sort((a, b) => b.sales - a.sales),
+            salesmen: [...salesmen.values()]
+                .filter(s => (isCompany || s.branch === scope.name) && s.target > 0)
+                .map(s => ({ ...s, ...project(s.target > 0 ? s.sales : 0, s.target) }))
+                .sort((a, b) => (b.achievedPct ?? -1) - (a.achievedPct ?? -1))
+        });
+
+        const branchList = [...branches.values()]
+            .map(scope => finalize(scope, false))
+            .filter(b => (targetBranches.has(b.name) && b.name !== t.unassigned) || b.target || b.sales || b.overdue || b.due)
+            .sort((a, b) => {
+                if (a.name === t.unassigned) return 1;
+                if (b.name === t.unassigned) return -1;
+                return b.targetedSales - a.targetedSales;
+            });
+
+        return {
+            monthKey, start, end, closed, elapsed, totalDays,
+            company: finalize(company, true),
+            branches: branchList
+        };
+    }
+
+    /* =====================================================
+       HTML التقرير (للمعاينة والطباعة)
+    ===================================================== */
+
+    function table(head, rows) {
+        return `<table><thead><tr>${head.map(h => `<th class="${h.n ? "n" : ""}">${esc(h.t)}</th>`).join("")}</tr></thead>
+            <tbody>${rows.length ? rows.join("") : `<tr><td colspan="${head.length}" class="empty">${esc(T().none)}</td></tr>`}</tbody></table>`;
+    }
+
+    function kpis(scope, data) {
+        const t = T();
+        const items = data.closed
+            ? [
+                [t.sales, money(scope.targetedSales)],
+                [t.target, money(scope.target)],
+                [t.achievedFinal, pct(scope.achievedPct), tone(scope.achievedPct)],
+                [t.remaining, money(scope.remaining)],
+                [t.collections, money(scope.collections)],
+                [t.invoices, money(scope.invoiceCount)],
+                [t.overdue, money(scope.overdue), "is-bad"],
+                [t.untargeted, money(scope.untargetedSales)]
+            ]
+            : [
+                [t.salesMtd, money(scope.targetedSales)],
+                [t.target, money(scope.target)],
+                [t.achievedMtd, pct(scope.achievedPct), tone(scope.achievedPct)],
+                [t.remaining, money(scope.remaining)],
+                [t.forecast, money(scope.forecast)],
+                [t.forecastPct, pct(scope.forecastPct), tone(scope.forecastPct)],
+                [t.collections, money(scope.collections)],
+                [t.invoices, money(scope.invoiceCount)],
+                [t.overdue, money(scope.overdue), "is-bad"],
+                [t.due, money(scope.due)],
+                [t.upcoming7, money(scope.upcomingTotal)],
+                [t.untargeted, money(scope.untargetedSales)]
+            ];
+
+        return `<div class="kpis">${items.map(([label, value, cls]) =>
+            `<div class="kpi ${cls || ""}"><span>${esc(label)}</span><strong>${value}</strong></div>`).join("")}</div>`;
+    }
+
+    function section(scope, data, isConsolidated, newPage) {
+        const t = T();
+        const closed = data.closed;
+        const title = (isConsolidated ? t.consolidated : `${t.branchReport}: ${scope.name}`) +
+            ` • ${monthName(data.monthKey)} (${closed ? t.final : t.mtd})`;
+
+        const branchTable = isConsolidated
+            ? `<h3>${esc(t.branches)}</h3>` + table(
+                [{ t: t.branch }, { t: t.sales, n: 1 }, { t: t.target, n: 1 }, { t: t.achieved, n: 1 },
+                 ...(closed ? [] : [{ t: t.forecastPct, n: 1 }]),
+                 { t: t.remaining, n: 1 }, { t: t.otherSales, n: 1 }, { t: t.collections, n: 1 }, { t: t.overdue, n: 1 }],
+                data.branches.map(b => `<tr>
+                    <td class="strong">${esc(b.name)}</td>
+                    <td class="n">${money(b.targetedSales)}</td>
+                    <td class="n">${money(b.target)}</td>
+                    <td class="n ${tone(b.achievedPct)}">${pct(b.achievedPct)}</td>
+                    ${closed ? "" : `<td class="n ${tone(b.forecastPct)}">${pct(b.forecastPct)}</td>`}
+                    <td class="n">${money(b.remaining)}</td>
+                    <td class="n">${money(b.untargetedSales)}</td>
+                    <td class="n">${money(b.collections)}</td>
+                    <td class="n">${money(b.overdue)}</td></tr>`))
+            : "";
+
+        const salesmenTable = table(
+            [{ t: t.salesman }, ...(isConsolidated ? [{ t: t.branch }] : []), { t: t.sales, n: 1 }, { t: t.target, n: 1 },
+             { t: t.achieved, n: 1 }, ...(closed ? [] : [{ t: t.forecastPct, n: 1 }]), { t: t.overdue, n: 1 }],
+            scope.salesmen.map(s => `<tr>
+                <td class="strong">${esc(s.name)}</td>
+                ${isConsolidated ? `<td>${esc(s.branch)}</td>` : ""}
+                <td class="n">${money(s.sales)}</td>
+                <td class="n">${s.target > 0 ? money(s.target) : `<span class="muted">${esc(t.noTarget)}</span>`}</td>
+                <td class="n ${tone(s.achievedPct)}">${pct(s.achievedPct)}</td>
+                ${closed ? "" : `<td class="n ${tone(s.forecastPct)}">${pct(s.forecastPct)}</td>`}
+                <td class="n">${money(s.overdue)}</td></tr>`));
+
+        const otherTable = scope.otherCodeList.length
+            ? `<h3>${esc(t.otherCodes)}</h3>` + table(
+                [{ t: t.code }, { t: t.salesman }, ...(isConsolidated ? [{ t: t.branch }] : []), { t: t.invoices, n: 1 }, { t: t.sales, n: 1 }],
+                scope.otherCodeList.map(o => `<tr>
+                    <td><bdi dir="ltr">${esc(o.code)}</bdi></td>
+                    <td class="strong">${esc(o.name)}</td>
+                    ${isConsolidated ? `<td>${esc(o.branch || t.unassigned)}</td>` : ""}
+                    <td class="n">${money(o.invoiceCount)}</td>
+                    <td class="n">${money(o.sales)}</td></tr>`))
+            : "";
+
+        const mix = scope.mix && scope.mix.hasData
+            ? `<h3>${esc(t.groups)}</h3>` + table(
+                [{ t: t.group }, { t: t.qty, n: 1 }, { t: t.value, n: 1 }, { t: t.avg, n: 1 }],
+                scope.mix.groups.filter(g => g.qty || g.value).map(g => `<tr>
+                    <td class="strong">${esc(window.DashboardProductMix.groupLabel(g.group))}</td>
+                    <td class="n">${money(g.qty)}</td><td class="n">${money(g.value)}</td>
+                    <td class="n">${g.qty ? money(g.value / g.qty) : "—"}</td></tr>`))
+            : "";
+
+        const overdueTable = `<h3>${esc(t.topOverdue)}</h3>` + table(
+            [{ t: t.customer }, { t: t.salesman }, ...(isConsolidated ? [{ t: t.branch }] : []), { t: t.balance, n: 1 }, { t: t.days, n: 1 }],
+            scope.topOverdue.map(o => `<tr>
+                <td>${esc(o.name)}</td><td>${esc(o.salesman)}</td>
+                ${isConsolidated ? `<td>${esc(o.branch || t.unassigned)}</td>` : ""}
+                <td class="n bad">${money(o.amount)}</td><td class="n">${money(o.days)}</td></tr>`));
+
+        const upcomingTable = closed ? "" :
+            `<h3>${esc(t.upcoming(scope.upcoming.length, money(scope.upcomingTotal)))}</h3>` + table(
+                [{ t: t.customer }, { t: t.salesman }, { t: t.dueDate }, { t: t.daysLeft, n: 1 }, { t: t.amount, n: 1 }],
+                scope.upcoming.slice(0, 15).map(u => `<tr>
+                    <td>${esc(u.name)}</td><td>${esc(u.salesman)}</td><td>${esc(dayLabel(u.dueDate))}</td>
+                    <td class="n">${money(u.remaining)}</td><td class="n">${money(u.amount)}</td></tr>`));
+
+        return `
+            <section class="${newPage ? "new-page" : ""}">
+                <div class="band">
+                    <h2>${esc(title)}</h2>
+                    <p>${esc(t.period)}: <bdi dir="ltr">${esc(dayLabel(data.start))} – ${esc(dayLabel(data.end))}</bdi> •
+                       ${esc(closed ? t.fullMonth : t.daysPassed(data.elapsed, data.totalDays))}</p>
+                </div>
+                <h3>${esc(t.kpis)}</h3>
+                ${kpis(scope, data)}
+                ${branchTable}
+                <h3>${esc(isConsolidated ? t.salesmen : t.branchSalesmen)}</h3>
+                ${salesmenTable}
+                ${otherTable}
+                ${mix}
+                ${overdueTable}
+                ${upcomingTable}
+                <p class="note">${esc(t.note(closed))}</p>
+            </section>`;
+    }
+
+    function documentHtml(data, scopeKey) {
+        const isArabic = lang() === "ar";
+        const logo = document.querySelector(".sidebar-brand-logo img")?.getAttribute("src") || "";
+        const realBranches = data.branches.filter(b => b.name !== T().unassigned);
+
+        let body = "";
+        if (scopeKey === "all") {
+            body = section(data.company, data, true, false) +
+                realBranches.map(b => section(b, data, false, true)).join("");
+        } else if (scopeKey === "company") {
+            body = section(data.company, data, true, false);
+        } else {
+            const branch = data.branches.find(b => b.name === scopeKey);
+            body = branch ? section(branch, data, false, false) : "";
+        }
+
+        const fileTitle = `Monthly-Report_${data.monthKey}_${scopeKey === "all" ? "All" : scopeKey === "company" ? "Consolidated" : scopeKey.replace(/\s+/g, "-")}`;
+
+        return `<!DOCTYPE html>
+<html lang="${isArabic ? "ar" : "en"}" dir="${isArabic ? "rtl" : "ltr"}">
+<head>
+<meta charset="UTF-8">
+<title>${esc(fileTitle)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 portrait; margin: 10mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: ${isArabic ? '"Cairo", "Inter"' : '"Inter", "Cairo"'}, Tahoma, sans-serif; color: #0c2e42; font-size: 11px;
+       font-variant-numeric: tabular-nums; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 14px; background: #fff; }
+@media print { body { padding: 0; } }
+header.doc { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+header.doc img { height: 36px; }
+header.doc strong { font-size: 15px; }
+.band { background: #0c2e42; color: #fff; padding: 10px 14px; margin-bottom: 4px; }
+.band h2 { font-size: 16px; font-weight: 800; }
+.band p { font-size: 10.5px; color: #b9d3df; margin-top: 2px; }
+.new-page { break-before: page; page-break-before: always; }
+h3 { font-size: 12.5px; font-weight: 800; margin: 12px 0 5px; padding-inline-start: 8px; border-inline-start: 4px solid #1c95b8; break-after: avoid; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.kpi { border: 1px solid #dfe6ec; border-top: 3px solid #1c95b8; padding: 6px 8px; break-inside: avoid; }
+.kpi span { display: block; color: #5b6b78; font-size: 9.5px; }
+.kpi strong { display: block; font-size: 15px; font-weight: 800; font-family: "Inter", "Cairo", sans-serif; }
+.kpi.is-good { border-top-color: #1f8a5b; } .kpi.is-good strong { color: #1f8a5b; }
+.kpi.is-warn { border-top-color: #c98a12; } .kpi.is-warn strong { color: #a8700a; }
+.kpi.is-bad { border-top-color: #c0392b; } .kpi.is-bad strong { color: #c0392b; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th { background: #0c2e42; color: #fff; font-weight: 700; padding: 5px 6px; text-align: start; font-size: 10px; white-space: nowrap; }
+td { padding: 4px 6px; border-bottom: 1px solid #e6ecf1; }
+tbody tr:nth-child(even) td { background: #f5f8fa; }
+.n { text-align: end; white-space: nowrap; } .strong { font-weight: 700; } .muted { color: #8595a2; } .bad { color: #c0392b; font-weight: 700; }
+td.is-good { color: #1f8a5b; font-weight: 700; } td.is-warn { color: #a8700a; font-weight: 700; } td.is-bad { color: #c0392b; font-weight: 700; }
+.empty { text-align: center; color: #8595a2; padding: 8px; }
+.note { margin-top: 10px; color: #8595a2; font-size: 9.5px; border-top: 1px solid #dfe6ec; padding-top: 5px; }
+</style>
+</head>
+<body>
+<header class="doc">
+    ${logo ? `<img src="${esc(logo)}" alt="">` : ""}
+    <strong>Al-Howail Tyres</strong>
+</header>
+${body}
+</body>
+</html>`;
+    }
+
+    /* =====================================================
+       نص الإيميل (إنجليزي، قصير) — للنسخ
+    ===================================================== */
+
+    function emailSubject(data) {
+        const range = `${dayLabel(data.start)} – ${dayLabel(data.end)}`;
+        return `Al-Howail Tyres | Monthly Sales Report | ${monthName(data.monthKey, "en")}` +
+            (data.closed ? " – Final" : ` – Month to Date (${range})`);
+    }
+
+    function emailHtml(data) {
+        const c = data.company;
+        const closed = data.closed;
+        const unassigned = T().unassigned;
+        const range = `${dayLabel(data.start)} – ${dayLabel(data.end)}`;
+        const color = value => (value == null ? "#5b6b78" : value >= 100 ? "#1f8a5b" : value >= 80 ? "#a8700a" : "#c0392b");
+        const th = 'style="background:#0c2e42;color:#ffffff;padding:6px 8px;font-size:12px;text-align:right;white-space:nowrap"';
+        const thl = 'style="background:#0c2e42;color:#ffffff;padding:6px 8px;font-size:12px;text-align:left"';
+        const td = 'style="padding:5px 8px;border-bottom:1px solid #e6ecf1;font-size:12px;text-align:right;white-space:nowrap"';
+        const tdl = 'style="padding:5px 8px;border-bottom:1px solid #e6ecf1;font-size:12px;text-align:left"';
+        const tf = 'style="padding:6px 8px;background:#e8f1f5;border-top:2px solid #0c2e42;font-size:12px;font-weight:bold;text-align:right;white-space:nowrap"';
+        const tfl = 'style="padding:6px 8px;background:#e8f1f5;border-top:2px solid #0c2e42;font-size:12px;font-weight:bold;text-align:left"';
+
+        const row = (b, total) => `<tr>
+            <td ${total ? tfl : tdl}><b>${esc(total ? "Total" : (b.name === unassigned ? "Unassigned" : b.name))}</b></td>
+            <td ${total ? tf : td}>${money(b.targetedSales)}</td>
+            <td ${total ? tf : td}>${money(b.target)}</td>
+            <td ${total ? tf : td}><b style="color:${color(b.achievedPct)}">${pct(b.achievedPct)}</b></td>
+            ${closed ? "" : `<td ${total ? tf : td}><b style="color:${color(b.forecastPct)}">${pct(b.forecastPct)}</b></td>`}
+            <td ${total ? tf : td}>${money(b.untargetedSales)}</td>
+            <td ${total ? tf : td}>${money(b.collections)}</td>
+            <td ${total ? tf : td}>${money(b.overdue)}</td></tr>`;
+
+        const branchNames = data.branches.filter(b => b.name !== unassigned).map(b => b.name).join(", ");
+        const intro = closed
+            ? `Please find below the <b>final</b> sales summary for <b>${esc(monthName(data.monthKey, "en"))}</b> (full month, ${esc(range)}).`
+            : `Please find below the month-to-date sales summary for <b>${esc(monthName(data.monthKey, "en"))}</b> (${esc(range)}, ${data.elapsed} of ${data.totalDays} working days).`;
+
+        return `<div style="font-family:Arial,Helvetica,sans-serif;color:#0c2e42;font-size:13px;line-height:1.5">
+<p>Dear Management,</p>
+<p>${intro} The consolidated report and a separate report for each branch (${esc(branchNames)}) are attached.</p>
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0">
+<tr><th ${thl}>Branch</th><th ${th}>Sales</th><th ${th}>Target</th><th ${th}>Achieved</th>${closed ? "" : `<th ${th}>Forecast</th>`}<th ${th}>Other Codes Sales</th><th ${th}>Collections</th><th ${th}>Overdue</th></tr>
+${data.branches.map(b => row(b, false)).join("")}
+${row(c, true)}
+</table>
+<p>${closed
+    ? `<b>Month result:</b> SAR ${money(c.targetedSales)} (${pct(c.achievedPct)} of target)`
+    : `<b>Month-end forecast:</b> SAR ${money(c.forecast)} (${pct(c.forecastPct)} of target)`}
+ &nbsp;•&nbsp; <b>Overdue:</b> SAR ${money(c.overdue)}${closed ? "" : ` &nbsp;•&nbsp; <b>Due within 7 days:</b> SAR ${money(c.upcomingTotal)}`}</p>
+<p>Best regards,<br>Al-Howail Tyres Sales Operations</p>
+<p style="color:#8595a2;font-size:11px">Amounts in SAR excluding VAT. Sales and achievement include codes with a target only; sales of other codes (no target, e.g. GM and customer offices) are shown separately.</p>
+</div>`;
+    }
+
+    function emailText(data) {
+        const c = data.company;
+        const unassigned = T().unassigned;
+        const lines = data.branches.map(b =>
+            `${b.name === unassigned ? "Unassigned" : b.name}: Sales ${money(b.targetedSales)} / Target ${money(b.target)} (${pct(b.achievedPct)})` +
+            (data.closed ? "" : `, Forecast ${pct(b.forecastPct)}`) + `, Other codes ${money(b.untargetedSales)}, Overdue ${money(b.overdue)}`);
+        return `Dear Management,\n\nPlease find below the ${data.closed ? "final" : "month-to-date"} sales summary for ${monthName(data.monthKey, "en")}.\n\n` +
+            lines.join("\n") + `\nTotal: Sales ${money(c.targetedSales)} / Target ${money(c.target)} (${pct(c.achievedPct)})\n\n` +
+            "Best regards,\nAl-Howail Tyres Sales Operations";
+    }
+
+    async function copyRich(html, text) {
+        try {
+            if (window.ClipboardItem && navigator.clipboard?.write) {
+                await navigator.clipboard.write([new ClipboardItem({
+                    "text/html": new Blob([html], { type: "text/html" }),
+                    "text/plain": new Blob([text], { type: "text/plain" })
+                })]);
+                return true;
+            }
+        } catch (error) { /* fallback below */ }
+
+        const holder = document.createElement("div");
+        holder.contentEditable = "true";
+        holder.style.cssText = "position:fixed;left:-9999px;top:0;";
+        holder.innerHTML = html;
+        document.body.appendChild(holder);
+        const range = document.createRange();
+        range.selectNodeContents(holder);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const ok = document.execCommand("copy");
+        selection.removeAllRanges();
+        holder.remove();
+        return ok;
+    }
+
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (error) {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.style.cssText = "position:fixed;left:-9999px;";
+            document.body.appendChild(area);
+            area.select();
+            const ok = document.execCommand("copy");
+            area.remove();
+            return ok;
+        }
+    }
+
+    /* =====================================================
+       Excel
+    ===================================================== */
+
+    function exportExcel() {
+        const data = state.data;
+        if (!data || !window.XLSX?.utils) return;
+
+        const t = T();
+        const workbook = window.XLSX.utils.book_new();
+        const add = (name, rows) => {
+            if (rows.length) window.XLSX.utils.book_append_sheet(workbook, window.XLSX.utils.json_to_sheet(rows), name.slice(0, 31));
+        };
+        const scopeRow = s => ({
+            [t.branch]: s.name,
+            [t.sales]: Math.round(s.targetedSales),
+            [t.target]: Math.round(s.target),
+            [t.achieved]: s.achievedPct == null ? "" : +s.achievedPct.toFixed(1),
+            ...(data.closed ? {} : { [t.forecastPct]: s.forecastPct == null ? "" : +s.forecastPct.toFixed(1) }),
+            [t.remaining]: Math.round(s.remaining),
+            [t.collections]: Math.round(s.collections),
+            [t.invoices]: s.invoiceCount,
+            [t.overdue]: Math.round(s.overdue),
+            [t.untargeted]: Math.round(s.untargetedSales)
+        });
+
+        add("Summary", data.branches.map(scopeRow).concat([{ ...scopeRow(data.company), [t.branch]: "Total" }]));
+        add("Salesmen", data.company.salesmen.map(s => ({
+            [t.salesman]: s.name,
+            [t.branch]: s.branch,
+            [t.sales]: Math.round(s.sales),
+            [t.target]: Math.round(s.target),
+            [t.achieved]: s.achievedPct == null ? "" : +s.achievedPct.toFixed(1),
+            ...(data.closed ? {} : { [t.forecastPct]: s.forecastPct == null ? "" : +s.forecastPct.toFixed(1) }),
+            [t.overdue]: Math.round(s.overdue)
+        })));
+
+        add("Other Codes", data.company.otherCodeList.map(o => ({
+            [t.code]: o.code,
+            [t.salesman]: o.name,
+            [t.branch]: o.branch,
+            [t.invoices]: o.invoiceCount,
+            [t.sales]: Math.round(o.sales)
+        })));
+
+        window.XLSX.writeFile(workbook, `Monthly_Report_${data.monthKey}.xlsx`);
+    }
+
+    /* =====================================================
+       الواجهة
+    ===================================================== */
+
+    function render() {
+        const frame = utils.byId("monthlyReportFrame");
+        if (!frame) return;
+
+        state.data = build(state.monthKey);
+
+        const scopeSelect = utils.byId("monthlyReportScope");
+        if (scopeSelect) {
+            const t = T();
+            const current = state.scope;
+            scopeSelect.innerHTML =
+                `<option value="all">${esc(t.all)}</option>` +
+                `<option value="company">${esc(t.consolidatedOnly)}</option>` +
+                state.data.branches.filter(b => b.name !== t.unassigned)
+                    .map(b => `<option value="${esc(b.name)}">${esc(t.branchReport)}: ${esc(b.name)}</option>`).join("");
+            scopeSelect.value = [...scopeSelect.options].some(o => o.value === current) ? current : "all";
+            state.scope = scopeSelect.value;
+        }
+
+        frame.srcdoc = documentHtml(state.data, state.scope);
+    }
+
+    function print() {
+        const frame = utils.byId("monthlyReportFrame");
+        const view = frame?.contentWindow;
+        if (!view) return;
+        const run = () => { try { view.focus(); view.print(); } catch (error) { console.error(error); } };
+        const ready = frame.contentDocument?.fonts?.ready;
+        if (ready) ready.then(run).catch(run); else run();
+    }
+
+    function close() {
+        utils.byId("monthlyReportModal")?.remove();
+    }
+
+    function open() {
+        const t = T();
+        close();
+
+        const months = availableMonths();
+        if (!state.monthKey || !months.includes(state.monthKey)) state.monthKey = months[0];
+
+        const modal = document.createElement("div");
+        modal.id = "monthlyReportModal";
+        modal.className = "report-preview-overlay";
+        modal.innerHTML = `
+            <section class="report-preview-card branch-report-card">
+                <header class="report-preview-header">
+                    <div>
+                        <h2>${esc(t.title)}</h2>
+                        <p>${esc(t.subtitle)}</p>
+                    </div>
+                    <button type="button" class="icon-button" data-mr="close" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </header>
+
+                <div class="report-preview-actions branch-report-actions">
+                    <label class="branch-report-select">
+                        <span>${esc(t.month)}</span>
+                        <select id="monthlyReportMonth">
+                            ${months.map(key => `<option value="${key}" ${key === state.monthKey ? "selected" : ""}>${esc(monthName(key))}</option>`).join("")}
+                        </select>
+                    </label>
+                    <label class="branch-report-select">
+                        <span>${esc(t.scope)}</span>
+                        <select id="monthlyReportScope"></select>
+                    </label>
+                    <span style="flex:1"></span>
+                    <button class="secondary-button" type="button" data-mr="subject">
+                        <i class="fa-regular fa-copy"></i><span>${esc(t.copySubject)}</span>
+                    </button>
+                    <button class="secondary-button" type="button" data-mr="body">
+                        <i class="fa-regular fa-envelope"></i><span>${esc(t.copyBody)}</span>
+                    </button>
+                    <button class="secondary-button" type="button" data-mr="excel">
+                        <i class="fa-solid fa-file-excel"></i><span>${esc(t.excel)}</span>
+                    </button>
+                    <button class="primary-button" type="button" data-mr="print">
+                        <i class="fa-solid fa-print"></i><span>${esc(t.print)}</span>
+                    </button>
+                </div>
+
+                <iframe id="monthlyReportFrame" class="branch-report-frame" title="${esc(t.title)}"></iframe>
+            </section>`;
+
+        document.body.appendChild(modal);
+
+        modal.addEventListener("click", async event => {
+            if (event.target === modal) { close(); return; }
+
+            const action = event.target.closest("[data-mr]")?.dataset.mr;
+            if (action === "close") close();
+            if (action === "print") print();
+            if (action === "excel") exportExcel();
+            if (action === "subject" && state.data) {
+                if (await copyText(emailSubject(state.data))) utils.showToast(t.copied, "success");
+            }
+            if (action === "body" && state.data) {
+                if (await copyRich(emailHtml(state.data), emailText(state.data))) utils.showToast(t.copied, "success");
+            }
+        });
+
+        utils.byId("monthlyReportMonth")?.addEventListener("change", event => {
+            state.monthKey = event.target.value;
+            render();
+        });
+
+        utils.byId("monthlyReportScope")?.addEventListener("change", event => {
+            state.scope = event.target.value;
+            render();
+        });
+
+        document.addEventListener("keydown", function onKey(event) {
+            if (event.key === "Escape") {
+                close();
+                document.removeEventListener("keydown", onKey);
+            }
+        });
+
+        render();
+    }
+
+    return Object.freeze({ open, close, build, emailSubject, emailHtml });
 })();
 
 </script>
