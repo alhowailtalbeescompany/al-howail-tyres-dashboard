@@ -4531,6 +4531,150 @@ body.visits-disabled [data-visits-feature] {
         grid-template-columns: 1fr;
     }
 }
+
+/* ===== Month-end forecast ===== */
+.forecast-kpi-card .kpi-value.is-good { color: var(--success, #1f8a5b); }
+.forecast-kpi-card .kpi-value.is-warn { color: var(--warning, #c98a12); }
+.forecast-kpi-card .kpi-value.is-bad { color: var(--danger, #c0392b); }
+
+.forecast-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface-soft, #eef3f6);
+    overflow: hidden;
+    margin: 6px 0 4px;
+}
+
+.forecast-bar i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--primary, #1c95b8);
+    border-radius: 999px;
+}
+
+.forecast-card {
+    margin-top: 20px;
+}
+
+.forecast-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.82rem;
+    background: var(--surface-soft, #eef3f6);
+}
+
+.forecast-pill.is-good { background: rgba(31, 138, 91, 0.14); color: #1f8a5b; }
+.forecast-pill.is-warn { background: rgba(201, 138, 18, 0.16); color: #a8700a; }
+.forecast-pill.is-bad { background: rgba(192, 57, 43, 0.14); color: #c0392b; }
+
+#profileForecastNote {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    margin-top: 2px;
+}
+
+/* ===== Product mix ===== */
+.product-mix-card {
+    margin-top: 20px;
+}
+
+.mix-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+}
+
+table.mix-table {
+    min-width: 640px;
+}
+
+.mix-grid h4 {
+    font-size: 0.95rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.mix-table .n {
+    text-align: end;
+}
+
+.mix-table small {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 400;
+}
+
+.mix-table .mix-group-row td {
+    background: var(--surface-soft);
+}
+
+.mix-table .mix-code-row td:first-child {
+    padding-inline-start: 22px;
+}
+
+.mix-code {
+    display: inline-block;
+    min-width: 34px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.mix-table tfoot td {
+    font-weight: 800;
+    border-top: 2px solid var(--border-strong);
+}
+
+.mix-bundle {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.mix-bundle div {
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.mix-bundle span {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.mix-bundle strong {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.mix-warning {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+    background: var(--warning-light, #fbf1dc);
+    font-size: 0.88rem;
+}
+
+.mix-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 1100px) {
+    .mix-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 </head>
 
@@ -5520,6 +5664,16 @@ body.visits-disabled [data-visits-feature] {
                             <small data-i18n="dashboard.selectedPeriod">خلال الفترة المختارة</small>
                         </article>
 
+                        <article class="kpi-card forecast-kpi-card">
+                            <div class="kpi-card-header">
+                                <span data-i18n="forecast.title">توقع نهاية الشهر</span>
+                                <div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div>
+                            </div>
+                            <strong class="kpi-value" id="forecastKpi">—</strong>
+                            <div class="forecast-bar"><i id="forecastKpiBar"></i></div>
+                            <small id="forecastKpiNote">—</small>
+                        </article>
+
                     </div>
 
 
@@ -6275,6 +6429,16 @@ body.visits-disabled [data-visits-feature] {
                         </div>
                         <div class="table-footer" id="productsTableFooter"></div>
                     </article>
+
+                    <article class="content-card product-mix-card">
+                        <div class="card-header">
+                            <div>
+                                <h3 data-i18n="productMix.title">المبيعات حسب مجموعة المنتج</h3>
+                                <p data-i18n="productMix.subtitle">TBR و PCR/LTR و OTR والإكسسوارات، مع متوسط سعر القطعة ونسبة بيع الجلبة والفالب</p>
+                            </div>
+                        </div>
+                        <div id="productMixContent"></div>
+                    </article>
                 </section>
 
 
@@ -6390,6 +6554,33 @@ body.visits-disabled [data-visits-feature] {
 
                         </div>
 
+                    </article>
+
+                    <article class="content-card forecast-card">
+                        <div class="card-header">
+                            <div>
+                                <h3 data-i18n="forecast.tableTitle">توقع نهاية الشهر الحالي</h3>
+                                <p id="forecastTableNote">—</p>
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="targets.salesmanName">اسم المندوب</th>
+                                        <th data-i18n="targets.branch">الفرع</th>
+                                        <th data-i18n="forecast.monthTarget">هدف الشهر</th>
+                                        <th data-i18n="forecast.mtd">المبيعات حتى الآن</th>
+                                        <th data-i18n="forecast.mtdPct">التحقيق حتى الآن</th>
+                                        <th data-i18n="forecast.forecast">التوقع</th>
+                                        <th data-i18n="forecast.forecastPct">التحقيق المتوقع</th>
+                                        <th data-i18n="forecast.requiredDaily">المطلوب يوميًا</th>
+                                        <th data-i18n="forecast.currentDaily">المعدل الحالي يوميًا</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="forecastTableBody"></tbody>
+                            </table>
+                        </div>
                     </article>
 
                 </section>
@@ -6683,6 +6874,12 @@ body.visits-disabled [data-visits-feature] {
                                 <strong id="profileVisitConversion">0%</strong>
                             </article>
 
+                            <article class="profile-kpi-card">
+                                <span data-i18n="forecast.title">توقع نهاية الشهر</span>
+                                <strong id="profileForecastValue">—</strong>
+                                <small id="profileForecastNote"></small>
+                            </article>
+
                         </div>
 
                         <article class="content-card profile-visits-card" data-visits-feature>
@@ -6708,6 +6905,16 @@ body.visits-disabled [data-visits-feature] {
                                     <tbody id="profileVisitsTableBody"></tbody>
                                 </table>
                             </div>
+                        </article>
+
+                        <article class="content-card product-mix-card" id="profileMixCard">
+                            <div class="card-header page-card-header">
+                                <div>
+                                    <h3 data-i18n="productMix.title">المبيعات حسب مجموعة المنتج</h3>
+                                    <p data-i18n="productMix.profileSubtitle">مبيعات المندوب في الفترة المختارة لكل مجموعة، ومتوسط سعر القطعة</p>
+                                </div>
+                            </div>
+                            <div id="profileMixContent"></div>
                         </article>
 
                         <div class="salesman-report-grid">
@@ -7642,6 +7849,24 @@ const TRANSLATIONS = {
             settings: "الإعدادات"
         },
 
+        forecast: {
+            title: "توقع نهاية الشهر",
+            tableTitle: "توقع نهاية الشهر الحالي",
+            monthTarget: "هدف الشهر",
+            mtd: "المبيعات حتى الآن",
+            mtdPct: "التحقيق حتى الآن",
+            forecast: "التوقع",
+            forecastPct: "التحقيق المتوقع",
+            requiredDaily: "المطلوب يوميًا",
+            currentDaily: "المعدل الحالي يوميًا"
+        },
+
+        productMix: {
+            title: "المبيعات حسب مجموعة المنتج",
+            subtitle: "TBR و PCR/LTR و OTR والإكسسوارات، مع متوسط سعر القطعة ونسبة بيع الجلبة والفالب",
+            profileSubtitle: "مبيعات المندوب في الفترة المختارة لكل مجموعة، ومتوسط سعر القطعة"
+        },
+
         training: {
             title: "أدلة تدريب المنتج",
             subtitle: "أدلة تدريب مندوبي المبيعات: الأكواد، البراندات، قراءة المقاس، والبيع للعملاء",
@@ -8032,6 +8257,24 @@ const TRANSLATIONS = {
             presentation: "Presentation",
             training: "Training",
             settings: "Settings"
+        },
+
+        forecast: {
+            title: "Month-end forecast",
+            tableTitle: "Current month-end forecast",
+            monthTarget: "Month target",
+            mtd: "Sales so far",
+            mtdPct: "Achieved so far",
+            forecast: "Forecast",
+            forecastPct: "Forecast achievement",
+            requiredDaily: "Needed per day",
+            currentDaily: "Current daily rate"
+        },
+
+        productMix: {
+            title: "Sales by product group",
+            subtitle: "TBR, PCR/LTR, OTR and accessories, with average price per piece and tube/flap attach rates",
+            profileSubtitle: "Salesman sales per group in the selected period, with average price per piece"
         },
 
         training: {
@@ -21497,6 +21740,54 @@ window.DashboardProfiles = (() => {
         };
     }
 
+    /* =====================================================
+       مجموعات المنتج + توقع نهاية الشهر للمندوب
+    ===================================================== */
+
+    function renderMixAndForecast(profile, code) {
+        const targetRow = findTargetRowByCode(code) || {};
+        const codes = getTargetCodes(targetRow).length
+            ? getTargetCodes(targetRow)
+            : [normalizeCode(code)];
+
+        const mixModule = window.DashboardProductMix;
+        const forecastModule = window.DashboardForecast;
+        const isArabic = utils.getLanguage() !== "en";
+
+        profile.productMix = mixModule
+            ? mixModule.summarize(invoiceRows.filter(row => rowBelongsToCodes(row, codes)))
+            : null;
+
+        profile.forecast = forecastModule
+            ? forecastModule.forSalesman(getTargetCode(targetRow) || code)
+            : null;
+
+        const mixContent = utils.byId("profileMixContent");
+
+        if (mixContent) {
+            mixContent.innerHTML = profile.productMix && profile.productMix.hasData
+                ? `<div class="table-wrapper">${mixModule.tableHTML(profile.productMix)}</div>${mixModule.bundleHTML(profile.productMix)}`
+                : `<p class="mix-empty">${utils.escapeHTML(utils.t("common.noData", "لا توجد بيانات متاحة"))}</p>`;
+        }
+
+        const forecast = profile.forecast;
+        const pct = value => (value == null || !isFinite(value) ? "—" : `${value.toFixed(1)}%`);
+
+        utils.setText(
+            "profileForecastValue",
+            forecast ? `${utils.formatCurrency(forecast.forecast)}` : "—"
+        );
+
+        utils.setText(
+            "profileForecastNote",
+            forecast
+                ? (isArabic
+                      ? `${pct(forecast.forecastPct)} من هدف ${forecast.monthLabel}`
+                      : `${pct(forecast.forecastPct)} of ${forecast.monthLabel} target`)
+                : ""
+        );
+    }
+
     function formatVisitMonth(month) {
         const [year, monthNumber] = String(month).split("-").map(Number);
 
@@ -21586,6 +21877,8 @@ window.DashboardProfiles = (() => {
 
         profile.visitStats = buildVisitStats(profile.code || code);
         renderVisits(profile.visitStats);
+
+        renderMixAndForecast(profile, code);
 
         return profile;
     }
@@ -22019,6 +22312,15 @@ window.DashboardProfiles = (() => {
                         font-size: 10px;
                     }
 
+                    .print-mix .n { text-align: center; }
+                    .print-mix .mix-group-row td { background: #eef3f7; }
+                    .print-mix .mix-code { font-weight: 700; color: #0f6f82; }
+                    .print-mix tfoot td { font-weight: 700; background: #f3f6f8; }
+                    .mix-bundle { display: flex; gap: 10px; margin-top: 8px; }
+                    .mix-bundle div { flex: 1; border: 1px solid #dbe3ea; border-radius: 8px; padding: 8px 12px; }
+                    .mix-bundle span { display: block; color: #66758a; font-size: 11px; }
+                    .mix-bundle strong { font-size: 16px; color: #0d3550; }
+
                     /* العنوان والرسم في نفس الصفحة */
                     .trend-block {
                         break-inside: avoid;
@@ -22253,6 +22555,18 @@ window.DashboardProfiles = (() => {
                     </div>
 
                     ${
+                        profile.forecast
+                            ? `
+                                <div>
+                                    Month-end Forecast (${utils.escapeHTML(profile.forecast.monthLabel)}):
+                                    ${utils.formatCurrency(profile.forecast.forecast)}
+                                    (${profile.forecast.forecastPct == null ? "—" : profile.forecast.forecastPct.toFixed(1) + "%"})
+                                </div>
+                            `
+                            : ""
+                    }
+
+                    ${
                         profile.visitStats
                             ? `
                                 <div>
@@ -22287,6 +22601,18 @@ window.DashboardProfiles = (() => {
                         <small>Previous month: ${utils.formatNumber(monthly.invoiceCount.previous, 0)} (${formatGrowth(monthly.invoiceCount.growth)})</small>
                     </div>
                 </div>
+
+                ${
+                    profile.productMix && profile.productMix.hasData && window.DashboardProductMix
+                        ? `
+                            <div class="trend-block">
+                                <h2 style="margin:26px 0 10px;font-size:18px;">Sales by Product Group</h2>
+                                ${window.DashboardProductMix.tableHTML(profile.productMix, { className: "print-mix" })}
+                                ${window.DashboardProductMix.bundleHTML(profile.productMix)}
+                            </div>
+                        `
+                        : ""
+                }
 
                 ${
                     profile.visitStats && profile.visitStats.monthly.length
@@ -32379,7 +32705,8 @@ window.DashboardBranchReport = (() => {
             balanceCustomers: new Map(),
             newList: [],
             reactivatedList: [],
-            upcoming: []
+            upcoming: [],
+            invoiceRows: []
         };
     }
 
@@ -32449,6 +32776,7 @@ window.DashboardBranchReport = (() => {
             const branch = getBranch(branchOf(row));
 
             [branch, company].forEach(aggregate => {
+                aggregate.invoiceRows.push(row);
                 aggregate.sales += amount;
                 aggregate.quantity += qty;
                 if (invoiceNo) aggregate.invoiceSet.add(invoiceNo);
@@ -32788,6 +33116,14 @@ window.DashboardBranchReport = (() => {
                     </div>
                 </div>
 
+                ${model.hasProducts && window.DashboardProductMix ? (() => {
+                    const mix = window.DashboardProductMix.summarize(branch.invoiceRows);
+                    return mix.hasData ? `
+                        <h3>${esc(lang() === "ar" ? "المبيعات حسب مجموعة المنتج" : "Sales by product group")}</h3>
+                        ${window.DashboardProductMix.tableHTML(mix, { className: "compact" })}
+                        ${window.DashboardProductMix.bundleHTML(mix)}` : "";
+                })() : ""}
+
                 ${model.hasProducts ? `
                     <h3>${esc(t.topProducts)}</h3>
                     ${table(
@@ -32911,6 +33247,13 @@ tr.risk td { background: #fbeeec !important; }
 .track i { position: absolute; top: 0; bottom: 0; inset-inline-start: 0; background: #9aabb7; }
 .meter b { min-width: 42px; text-align: end; font-size: 10px; }
 .meter.is-good i { background: #1f8a5b; } .meter.is-warn i { background: #c98a12; } .meter.is-bad i { background: #c0392b; }
+tr.mix-group-row td { background: #e8f1f5 !important; font-weight: 700; }
+.mix-code { font-weight: 800; color: #1c95b8; }
+td small, td.n small { display: block; color: #8595a2; font-size: 9px; }
+.mix-bundle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+.mix-bundle div { border: 1px solid #dfe6ec; padding: 5px 8px; }
+.mix-bundle span { display: block; color: #5b6b78; font-size: 10px; }
+.mix-bundle strong { font-size: 14px; font-weight: 800; }
 footer.doc { margin-top: 10px; color: #8595a2; font-size: 9.5px; border-top: 1px solid #dfe6ec; padding-top: 5px; display: flex; justify-content: space-between; }
 </style>
 </head>
@@ -33218,6 +33561,588 @@ window.DashboardTraining = (() => {
 
     return Object.freeze({ initialize, view, download });
 })();
+</script>
+<script>
+/* ===== product-mix.js ===== */
+"use strict";
+
+/* =========================================================
+   مجموعات المنتج (حسب دليل التدريب)
+   TBR      = TRT
+   PCR/LTR  = PRT + SUV + LRT
+   OTR      = NLT + FLR + FLT
+   إكسسوارات = TB (جلب) + FL (فالبات)
+   الكود يتحدد من: عمود المجموعة لو موجود ← كود الصنف ← وصف المقاس
+========================================================= */
+
+window.DashboardProductMix = (() => {
+    const utils = window.DashboardUtils;
+
+    const CODES = ["TRT", "LRT", "PRT", "SUV", "NLT", "FLR", "FLT", "TB", "FL", "OTHERS"];
+
+    const CODE_GROUP = {
+        TRT: "TBR",
+        PRT: "PCR",
+        SUV: "PCR",
+        LRT: "PCR",
+        NLT: "OTR",
+        FLR: "OTR",
+        FLT: "OTR",
+        TB: "ACC",
+        FL: "ACC",
+        OTHERS: "OTHERS"
+    };
+
+    const GROUPS = ["TBR", "PCR", "OTR", "ACC", "OTHERS"];
+
+    const TEXT = {
+        ar: {
+            groups: { TBR: "TBR شاحنات", PCR: "PCR/LTR ملاكي ونقل خفيف", OTR: "OTR نايلون ومعدات", ACC: "إكسسوارات (جلب وفالبات)", OTHERS: "أخرى" },
+            codes: {
+                TRT: "شاحنات راديال", LRT: "نقل خفيف", PRT: "ملاكي", SUV: "دفع رباعي",
+                NLT: "نايلون شاحنات ومعدات", FLR: "رافعات راديال", FLT: "رافعات نايلون",
+                TB: "جلب", FL: "فالبات", OTHERS: "أخرى / غير مصنف"
+            }
+        },
+        en: {
+            groups: { TBR: "TBR Truck", PCR: "PCR/LTR Passenger & light truck", OTR: "OTR Nylon & equipment", ACC: "Accessories (tubes & flaps)", OTHERS: "Others" },
+            codes: {
+                TRT: "Radial truck", LRT: "Light truck", PRT: "Passenger", SUV: "SUV",
+                NLT: "Nylon truck & OTR", FLR: "Forklift radial", FLT: "Forklift nylon",
+                TB: "Tubes", FL: "Flaps", OTHERS: "Others / unclassified"
+            }
+        }
+    };
+
+    const lang = () => (utils.getLanguage() === "en" ? "en" : "ar");
+    const groupLabel = group => TEXT[lang()].groups[group] || group;
+    const codeLabel = code => TEXT[lang()].codes[code] || code;
+    const num = value => utils.toNumber(value);
+    const clean = value => String(value == null ? "" : value).trim();
+
+    function codeFromText(text) {
+        const value = clean(text).toUpperCase();
+
+        if (!value) return "";
+
+        const three = value.match(/(?:^|[^A-Z])(TRT|LRT|LTR|PRT|SUV|NLT|FLR|FLT)(?:[^A-Z]|$)/);
+        if (three) return three[1] === "LTR" ? "LRT" : three[1];
+
+        const start = value.match(/^(TRT|LRT|LTR|PRT|SUV|NLT|FLR|FLT)/);
+        if (start) return start[1] === "LTR" ? "LRT" : start[1];
+
+        if (/^TB(?:[^A-Z]|$)/.test(value) || /^TB\d/.test(value)) return "TB";
+        if (/^FL(?:[^A-Z]|$)/.test(value) || /^FL\d/.test(value)) return "FL";
+
+        if (/(?:^|[^A-Z])TBR(?:[^A-Z]|$)/.test(value)) return "TRT";
+        if (/(?:^|[^A-Z])OTR(?:[^A-Z]|$)/.test(value)) return "NLT";
+        if (/(?:^|[^A-Z])PCR(?:[^A-Z]|$)/.test(value)) return "PRT";
+
+        return "";
+    }
+
+    function codeFromDescription(description) {
+        const text = clean(description).toUpperCase();
+
+        if (!text) return "";
+
+        if (/\bTUBES?\b|جلب|جلبة|انبوب|أنبوب/.test(text)) return "TB";
+        if (/\bFLAPS?\b|فالب|فلاب/.test(text)) return "FL";
+
+        if (/FORK\s*LIFT|FORKLIFT|\bSOLID\b|رافع/.test(text)) {
+            return /\d{1,2}\.\d{2}R\d|\bR\d{1,2}\b/.test(text) ? "FLR" : "FLT";
+        }
+
+        // LT245/75R16 أو 195R15C أو 215/70R15C ← نقل خفيف
+        if (/\bLT\s?\d{3}\/\d{2}R\d{2}|\d{3}(?:\/\d{2})?R1[2-6]C\b|\d{3}\/\d{2}R1[2-6]\s*C\b/.test(text)) return "LRT";
+
+        // شاحنات راديال: 315/80R22.5 | 12R22.5 | 11R22.5 | 12.00R20 | 1200R20 | 265/70R19.5
+        if (
+            /\d{2,3}(?:\/\d{2})?\s?R\s?(17\.5|19\.5|22\.5|24\.5)\b/.test(text) ||
+            /\b\d{2}\.\d{2}\s?R\s?(20|24)\b/.test(text) ||
+            /\b\d{4}\s?R\s?(20|24)\b/.test(text)
+        ) {
+            return "TRT";
+        }
+
+        // نايلون/دبل (bias): 12.00-20 | 8.25-16 | 7.50-16 | 28x9-15 | 6.50-10
+        const bias = text.match(/\b(\d{1,2}(?:\.\d{2})?|\d{2}X\d{1,2}(?:\.\d{1,2})?)\s?-\s?(\d{1,2})\b/);
+        if (bias) return Number(bias[2]) <= 15 ? "FLT" : "NLT";
+
+        // ملاكي / دفع رباعي: 205/55R16 | 265/65R17
+        const radial = text.match(/\b(\d{3})\/(\d{2})\s?Z?R\s?(\d{2})\b/);
+        if (radial) {
+            if (/\bSUV\b|4X4|\bA\/?T\b|\bM\/?T\b|\bH\/?T\b|\bR\/?T\b/.test(text)) return "SUV";
+            return "PRT";
+        }
+
+        return "";
+    }
+
+    function classify(row) {
+        const explicit =
+            codeFromText(row?.productGroup) ||
+            codeFromText(row?.category) ||
+            codeFromText(row?.itemGroup);
+
+        if (explicit) return explicit;
+
+        return (
+            codeFromText(row?.productCode) ||
+            codeFromDescription(row?.productDescription) ||
+            codeFromDescription(row?.productCode) ||
+            "OTHERS"
+        );
+    }
+
+    /* جلبة/فالب تتباع مع الإطارات اللي بجلبة (Tube Type):
+       نايلون شاحنات NLT، وراديال الشاحنات بجنط مش ".5" (مثل 12.00R20). */
+    function isTubeTypeTyre(row, code) {
+        if (code === "NLT") return true;
+        if (code !== "TRT") return false;
+
+        const text = `${clean(row?.productDescription)} ${clean(row?.productCode)}`.toUpperCase();
+        return /R\s?(20|24)\b/.test(text) && !/R\s?(17|19|22|24)\.5/.test(text);
+    }
+
+    function summarize(rows) {
+        const codes = new Map(CODES.map(code => [code, { code, qty: 0, value: 0 }]));
+        let tubeTypeQty = 0;
+        let total = 0;
+
+        (rows || []).forEach(row => {
+            const code = classify(row);
+            const qty = num(row.invoiceQuantity);
+            const value = num(row.salesWithoutTax);
+            const entry = codes.get(code) || codes.get("OTHERS");
+
+            entry.qty += qty;
+            entry.value += value;
+            total += value;
+
+            if (isTubeTypeTyre(row, code)) tubeTypeQty += qty;
+        });
+
+        const groups = new Map(GROUPS.map(group => [group, { group, qty: 0, value: 0, codes: [] }]));
+
+        codes.forEach(entry => {
+            const group = groups.get(CODE_GROUP[entry.code]);
+            group.qty += entry.qty;
+            group.value += entry.value;
+            if (entry.qty || entry.value) group.codes.push(entry);
+        });
+
+        const tubes = codes.get("TB").qty;
+        const flaps = codes.get("FL").qty;
+
+        return {
+            total,
+            codes: [...codes.values()],
+            groups: [...groups.values()],
+            tubeTypeQty,
+            tubeAttach: tubeTypeQty > 0 ? (tubes / tubeTypeQty) * 100 : null,
+            flapAttach: tubeTypeQty > 0 ? (flaps / tubeTypeQty) * 100 : null,
+            unclassifiedShare: total > 0 ? (codes.get("OTHERS").value / total) * 100 : 0,
+            hasData: total > 0
+        };
+    }
+
+    const money = value => new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(num(value)));
+    const pct = value => (value == null || !isFinite(value) ? "—" : `${value.toFixed(1)}%`);
+    const avg = entry => (entry.qty > 0 ? money(entry.value / entry.qty) : "—");
+
+    /* جدول HTML (للشاشة والطباعة) */
+    function tableHTML(summary, options = {}) {
+        const esc = utils.escapeHTML;
+        const ar = lang() === "ar";
+        const head = ar
+            ? ["المجموعة / الكود", "الكمية", "القيمة", "متوسط سعر القطعة", "النسبة"]
+            : ["Group / code", "Qty", "Value", "Avg price / piece", "Share"];
+
+        const rows = summary.groups
+            .filter(group => group.qty || group.value)
+            .map(group => {
+                const groupRow = `
+                    <tr class="mix-group-row">
+                        <td><strong>${esc(groupLabel(group.group))}</strong></td>
+                        <td class="n"><strong>${money(group.qty)}</strong></td>
+                        <td class="n"><strong>${money(group.value)}</strong></td>
+                        <td class="n"><strong>${avg(group)}</strong></td>
+                        <td class="n"><strong>${pct(summary.total ? (group.value / summary.total) * 100 : null)}</strong></td>
+                    </tr>`;
+
+                const codeRows = group.codes.length > 1 || options.showCodes
+                    ? group.codes.map(entry => `
+                        <tr class="mix-code-row">
+                            <td><span class="mix-code">${esc(entry.code === "OTHERS" ? "—" : entry.code)}</span> ${esc(codeLabel(entry.code))}</td>
+                            <td class="n">${money(entry.qty)}</td>
+                            <td class="n">${money(entry.value)}</td>
+                            <td class="n">${avg(entry)}</td>
+                            <td class="n">${pct(summary.total ? (entry.value / summary.total) * 100 : null)}</td>
+                        </tr>`).join("")
+                    : "";
+
+                return groupRow + codeRows;
+            })
+            .join("");
+
+        return `
+            <table class="${options.className || "data-table"} mix-table">
+                <thead><tr>${head.map((label, index) => `<th class="${index ? "n" : ""}">${esc(label)}</th>`).join("")}</tr></thead>
+                <tbody>${rows || `<tr><td colspan="5" class="empty">${esc(utils.t("common.noData", ar ? "لا توجد بيانات متاحة" : "No data"))}</td></tr>`}</tbody>
+                <tfoot><tr>
+                    <td>${esc(ar ? "الإجمالي" : "Total")}</td>
+                    <td class="n">${money(summary.codes.reduce((s, c) => s + c.qty, 0))}</td>
+                    <td class="n">${money(summary.total)}</td>
+                    <td class="n"></td>
+                    <td class="n">${summary.total ? "100.0%" : "—"}</td>
+                </tr></tfoot>
+            </table>`;
+    }
+
+    function bundleHTML(summary) {
+        const esc = utils.escapeHTML;
+        const ar = lang() === "ar";
+
+        if (!summary.tubeTypeQty) return "";
+
+        return `
+            <div class="mix-bundle">
+                <div><span>${esc(ar ? "إطارات بجلبة (Tube Type)" : "Tube-type tyres")}</span><strong>${money(summary.tubeTypeQty)}</strong></div>
+                <div><span>${esc(ar ? "نسبة بيع الجلبة معاها" : "Tube attach rate")}</span><strong>${pct(summary.tubeAttach)}</strong></div>
+                <div><span>${esc(ar ? "نسبة بيع الفالب معاها" : "Flap attach rate")}</span><strong>${pct(summary.flapAttach)}</strong></div>
+            </div>`;
+    }
+
+    /* =====================================================
+       كارت صفحة المنتجات: الشركة + مصفوفة المندوبين
+    ===================================================== */
+
+    let pageRows = [];
+
+    function salesmanMatrix(rows) {
+        const map = new Map();
+
+        rows.forEach(row => {
+            const key = clean(row.salesmanCode) || "—";
+            if (!map.has(key)) map.set(key, { code: key, name: clean(row.salesmanName) || key, branch: clean(row.branch), rows: [] });
+            map.get(key).rows.push(row);
+        });
+
+        return [...map.values()]
+            .map(item => ({ ...item, summary: summarize(item.rows) }))
+            .filter(item => item.summary.total > 0)
+            .sort((a, b) => b.summary.total - a.summary.total);
+    }
+
+    function renderPage() {
+        const container = utils.byId("productMixContent");
+        if (!container) return;
+
+        const esc = utils.escapeHTML;
+        const ar = lang() === "ar";
+        const summary = summarize(pageRows);
+
+        if (!summary.hasData) {
+            container.innerHTML = `<p class="mix-empty">${esc(utils.t("common.noData", ar ? "لا توجد بيانات متاحة" : "No data"))}</p>`;
+            return;
+        }
+
+        const matrix = salesmanMatrix(pageRows);
+        const groupValue = (item, group) => item.summary.groups.find(g => g.group === group);
+        const cell = (item, group) => {
+            const entry = groupValue(item, group);
+            return entry && (entry.qty || entry.value)
+                ? `<td class="n">${money(entry.value)}<small>${avg(entry)} / ${esc(ar ? "قطعة" : "pc")}</small></td>`
+                : `<td class="n muted">—</td>`;
+        };
+
+        container.innerHTML = `
+            ${summary.unclassifiedShare > 5 ? `
+                <div class="mix-warning">
+                    <i class="fa-solid fa-circle-info"></i>
+                    ${esc(ar
+                        ? `${pct(summary.unclassifiedShare)} من المبيعات مش متصنفة (أخرى). لو الرقم كبير، ابعت صورة من عمود كود الصنف في شيت الفواتير عشان يتظبط التصنيف.`
+                        : `${pct(summary.unclassifiedShare)} of sales could not be classified (Others).`)}
+                </div>` : ""}
+
+            <div class="mix-grid">
+                <div>
+                    <h4>${esc(ar ? "الشركة حسب المجموعة والكود" : "Company by group and code")}</h4>
+                    <div class="table-wrapper">${tableHTML(summary)}</div>
+                    ${bundleHTML(summary)}
+                </div>
+                <div>
+                    <h4>${esc(ar ? "المندوبين حسب المجموعة (القيمة ومتوسط سعر القطعة)" : "Salesmen by group (value and avg price per piece)")}</h4>
+                    <div class="table-wrapper">
+                        <table class="data-table mix-table mix-matrix">
+                            <thead><tr>
+                                <th>${esc(ar ? "المندوب" : "Salesman")}</th>
+                                <th class="n">TBR</th>
+                                <th class="n">PCR/LTR</th>
+                                <th class="n">OTR</th>
+                                <th class="n">${esc(ar ? "إكسسوارات" : "Accessories")}</th>
+                                <th class="n">${esc(ar ? "بيع الجلبة" : "Tube attach")}</th>
+                            </tr></thead>
+                            <tbody>
+                                ${matrix.map(item => `
+                                    <tr>
+                                        <td><strong>${esc(item.name)}</strong><small>${esc(item.branch)}</small></td>
+                                        ${cell(item, "TBR")}
+                                        ${cell(item, "PCR")}
+                                        ${cell(item, "OTR")}
+                                        ${cell(item, "ACC")}
+                                        <td class="n">${pct(item.summary.tubeAttach)}</td>
+                                    </tr>`).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function setData(rows) {
+        pageRows = Array.isArray(rows) ? rows : [];
+        renderPage();
+    }
+
+    return Object.freeze({
+        classify,
+        summarize,
+        tableHTML,
+        bundleHTML,
+        setData,
+        render: renderPage,
+        groupLabel,
+        codeLabel
+    });
+})();
+
+
+/* ===== forecast.js ===== */
+
+/* =========================================================
+   توقع نهاية الشهر الحالي
+   التوقع = مبيعات الشهر حتى الآن ÷ أيام العمل اللي فاتت × أيام عمل الشهر
+   أيام العمل = كل الأيام ما عدا الجمعة.
+   في الإطارات: مبيعات الأكواد اللي ليها هدف فقط (زي نسبة التحقيق).
+========================================================= */
+
+window.DashboardForecast = (() => {
+    const utils = window.DashboardUtils;
+    const num = value => utils.toNumber(value);
+    const clean = value => String(value == null ? "" : value).trim();
+    const lang = () => (utils.getLanguage() === "en" ? "en" : "ar");
+
+    const iso = date =>
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+    function workingDays(year, monthIndex, fromDay, toDay) {
+        let count = 0;
+        for (let day = fromDay; day <= toDay; day += 1) {
+            if (new Date(year, monthIndex, day).getDay() !== 5) count += 1;
+        }
+        return count;
+    }
+
+    function splitCodes(value) {
+        return clean(value).split(/\s*(?:\+|,|\/|&)\s*/).map(clean).filter(Boolean);
+    }
+
+    function codesMatch(rowCode, wanted) {
+        if (!wanted.length) return true;
+        const rowCodes = splitCodes(rowCode);
+        return rowCodes.some(code => wanted.includes(code)) || wanted.includes(clean(rowCode));
+    }
+
+    function monthTarget(row, monthNumber) {
+        const quarter = Math.floor((monthNumber - 1) / 3) + 1;
+        const monthly = num(row[`monthlyTargetQ${quarter}`]);
+        if (monthly > 0) return monthly;
+        const quarterly = num(row[`targetQ${quarter}`]);
+        return quarterly > 0 ? quarterly / 3 : 0;
+    }
+
+    /* filters: { branch, salesmanCodes: [] } */
+    function compute(filters = {}) {
+        const state = window.DashboardApp?.getState?.();
+        const raw = state?.rawData || {};
+        const now = new Date();
+        const year = now.getFullYear();
+        const monthIndex = now.getMonth();
+        const monthKey = iso(now).slice(0, 7);
+        const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+        const branch = clean(filters.branch).toLowerCase();
+        const wanted = (filters.salesmanCodes || []).flatMap(splitCodes);
+
+        const inScope = row =>
+            (!branch || clean(row.branch).toLowerCase() === branch) &&
+            codesMatch(row.salesmanCode, wanted);
+
+        const targets = (raw.target || []).filter(inScope);
+        const targetCodes = new Set();
+        const perSalesman = new Map();
+
+        targets.forEach(row => {
+            const target = monthTarget(row, monthIndex + 1);
+            if (target > 0) splitCodes(row.salesmanCode).concat(clean(row.salesmanCode)).forEach(code => targetCodes.add(code));
+
+            perSalesman.set(clean(row.salesmanCode), {
+                code: clean(row.salesmanCode),
+                name: clean(row.salesmanName) || clean(row.salesmanCode),
+                branch: clean(row.branch),
+                codes: splitCodes(row.salesmanCode),
+                target,
+                mtd: 0
+            });
+        });
+
+        const monthInvoices = (raw.invoices || []).filter(row =>
+            String(row.invoiceDate || "").slice(0, 7) === monthKey && inScope(row)
+        );
+
+        // آخر يوم فيه بيانات (الشيت ممكن يكون متحدث لحد امبارح)
+        const latestDate = monthInvoices
+            .map(row => String(row.invoiceDate || "").slice(0, 10))
+            .sort()
+            .pop();
+
+        const dataDay = latestDate ? Math.min(Number(latestDate.slice(8, 10)), now.getDate()) : now.getDate();
+
+        let mtd = 0;
+        let mtdAll = 0;
+
+        monthInvoices.forEach(row => {
+            const amount = num(row.salesWithoutTax);
+            const code = clean(row.salesmanCode);
+            mtdAll += amount;
+
+            const hasTarget = splitCodes(code).some(item => targetCodes.has(item)) || targetCodes.has(code);
+            if (hasTarget) mtd += amount;
+
+            perSalesman.forEach(entry => {
+                if (entry.codes.some(item => splitCodes(code).includes(item)) || entry.code === code) {
+                    entry.mtd += amount;
+                }
+            });
+        });
+
+        const elapsed = Math.max(workingDays(year, monthIndex, 1, dataDay), 1);
+        const total = workingDays(year, monthIndex, 1, lastDay);
+        const remaining = Math.max(total - workingDays(year, monthIndex, 1, now.getDate()), 0);
+        const target = targets.reduce((sum, row) => sum + monthTarget(row, monthIndex + 1), 0);
+
+        const project = (sales, goal) => {
+            const forecast = (sales / elapsed) * total;
+            return {
+                forecast,
+                forecastPct: goal > 0 ? (forecast / goal) * 100 : null,
+                mtdPct: goal > 0 ? (sales / goal) * 100 : null,
+                requiredDaily: goal > 0 && remaining > 0 ? Math.max(goal - sales, 0) / remaining : null,
+                currentDaily: sales / elapsed
+            };
+        };
+
+        return {
+            monthKey,
+            monthLabel: new Intl.DateTimeFormat(lang() === "en" ? "en-GB" : "ar-SA-u-ca-gregory-nu-latn", { month: "long", year: "numeric" }).format(now),
+            elapsed,
+            total,
+            remaining,
+            dataUntil: latestDate || iso(now),
+            target,
+            mtd,
+            mtdAll,
+            ...project(mtd, target),
+            salesmen: [...perSalesman.values()]
+                .filter(entry => entry.target > 0 || entry.mtd > 0)
+                .map(entry => ({ ...entry, ...project(entry.mtd, entry.target) }))
+                .sort((a, b) => (b.forecastPct ?? -1) - (a.forecastPct ?? -1))
+        };
+    }
+
+    const money = value => new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(num(value)));
+    const pct = value => (value == null || !isFinite(value) ? "—" : `${value.toFixed(1)}%`);
+    const tone = value => (value == null ? "" : value >= 100 ? "is-good" : value >= 80 ? "is-warn" : "is-bad");
+
+    function currentFilters() {
+        const filters = window.DashboardApp?.getState?.()?.filteredData?.filters || {};
+
+        return {
+            branch: filters.branch || "",
+            salesmanCodes: splitCodes(filters.salesmanCode || "")
+        };
+    }
+
+    /* كارت الداشبورد */
+    function renderDashboard() {
+        const value = utils.byId("forecastKpi");
+        if (!value) return;
+
+        const result = compute(currentFilters());
+        const ar = lang() === "ar";
+
+        value.textContent = utils.formatCurrency(result.forecast);
+        value.className = `kpi-value ${tone(result.forecastPct)}`;
+
+        utils.setText(
+            "forecastKpiNote",
+            ar
+                ? `${pct(result.forecastPct)} من هدف ${result.monthLabel} • المطلوب يوميًا: ${result.requiredDaily == null ? "—" : money(result.requiredDaily)}`
+                : `${pct(result.forecastPct)} of ${result.monthLabel} target • Needed per day: ${result.requiredDaily == null ? "—" : money(result.requiredDaily)}`
+        );
+
+        const bar = utils.byId("forecastKpiBar");
+        if (bar) bar.style.width = `${Math.max(0, Math.min(100, result.forecastPct || 0)).toFixed(1)}%`;
+    }
+
+    /* جدول صفحة الأهداف */
+    function renderTargetsTable() {
+        const body = utils.byId("forecastTableBody");
+        if (!body) return;
+
+        const result = compute(currentFilters());
+        const esc = utils.escapeHTML;
+        const ar = lang() === "ar";
+
+        utils.setText(
+            "forecastTableNote",
+            ar
+                ? `${result.monthLabel} • مرّ ${result.elapsed} من ${result.total} يوم عمل (بدون الجمعة) • باقي ${result.remaining} يوم • البيانات لحد ${result.dataUntil}`
+                : `${result.monthLabel} • ${result.elapsed} of ${result.total} working days passed (Fridays excluded) • ${result.remaining} left • data until ${result.dataUntil}`
+        );
+
+        const row = item => `
+            <tr>
+                <td><strong>${esc(item.name)}</strong></td>
+                <td>${esc(item.branch || "")}</td>
+                <td class="n">${item.target > 0 ? money(item.target) : "—"}</td>
+                <td class="n">${money(item.mtd)}</td>
+                <td class="n">${pct(item.mtdPct)}</td>
+                <td class="n"><strong>${money(item.forecast)}</strong></td>
+                <td class="n"><span class="forecast-pill ${tone(item.forecastPct)}">${pct(item.forecastPct)}</span></td>
+                <td class="n">${item.requiredDaily == null ? "—" : money(item.requiredDaily)}</td>
+                <td class="n">${money(item.currentDaily)}</td>
+            </tr>`;
+
+        body.innerHTML = result.salesmen.length
+            ? result.salesmen.map(row).join("") +
+              `<tr class="table-total-row">${row({ ...result, name: ar ? "الإجمالي" : "Total", branch: "" }).replace(/^\s*<tr>|<\/tr>\s*$/g, "")}</tr>`
+            : utils.emptyTableRow(9, utils.t("common.noData", ar ? "لا توجد بيانات متاحة" : "No data"));
+    }
+
+    function forSalesman(code) {
+        return compute({ salesmanCodes: splitCodes(code) });
+    }
+
+    function render() {
+        renderDashboard();
+        renderTargetsTable();
+    }
+
+    return Object.freeze({ compute, forSalesman, render, renderDashboard, renderTargetsTable });
+})();
+
 </script>
 <script>
 /* ===== app.js ===== */
@@ -34210,6 +35135,17 @@ window.DashboardApp = (() => {
             profileDueOverdue
         );
 
+        callModule(
+            window.DashboardProductMix,
+            "setData",
+            data.invoices
+        );
+
+        callModule(
+            window.DashboardForecast,
+            "render"
+        );
+
         updateLastUpdate(
             data.updatedAt
         );
@@ -34273,6 +35209,16 @@ window.DashboardApp = (() => {
         callModule(
             window.DashboardPresentation,
             "refresh"
+        );
+
+        callModule(
+            window.DashboardProductMix,
+            "render"
+        );
+
+        callModule(
+            window.DashboardForecast,
+            "render"
         );
     }
 
