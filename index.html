@@ -4378,6 +4378,12 @@ body.visits-disabled [data-visits-feature] {
     display: none !important;
 }
 
+.profile-weekly-card { margin-top: 18px; }
+.profile-weekly-card .weekly-table-wrapper { max-height: 460px; overflow: auto; }
+.profile-weekly-card .table-total-row td { background: var(--surface-muted, rgba(0,0,0,.04)); }
+.profile-weekly-card .wk-up { color: #15803d; font-weight: 600; }
+.profile-weekly-card .wk-down { color: #b91c1c; font-weight: 600; }
+.profile-weekly-card .wk-partial { font-size: 11px; opacity: .7; margin-inline-start: 4px; }
 .profile-visits-card {
     margin-bottom: 20px;
 }
@@ -6907,6 +6913,31 @@ table.mix-table {
                             </div>
                         </article>
 
+                        <article class="content-card profile-weekly-card" id="profileWeeklyCard">
+                            <div class="card-header page-card-header">
+                                <div>
+                                    <h3 data-i18n="salesmanProfiles.weeklySales">المبيعات الأسبوعية</h3>
+                                    <p data-i18n="salesmanProfiles.weeklySalesSubtitle">مبيعات المندوب لكل أسبوع (السبت – الجمعة) في الفترة المختارة</p>
+                                </div>
+                            </div>
+                            <div class="table-wrapper weekly-table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th data-i18n="salesmanProfiles.week">الأسبوع</th>
+                                            <th data-i18n="salesmanProfiles.sales">المبيعات</th>
+                                            <th data-i18n="salesmanProfiles.invoicesCount">الفواتير</th>
+                                            <th data-i18n="salesmanProfiles.weekCustomers">العملاء</th>
+                                            <th data-i18n="salesmanProfiles.weekShare">النسبة من الإجمالي</th>
+                                            <th data-i18n="salesmanProfiles.weekChange">التغير عن الأسبوع السابق</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="profileWeeklyTableBody"></tbody>
+                                </table>
+                            </div>
+                        </article>
+
                         <article class="content-card product-mix-card" id="profileMixCard">
                             <div class="card-header page-card-header">
                                 <div>
@@ -8068,6 +8099,12 @@ const TRANSLATIONS = {
             visitConversion: "نسبة تحويل الزيارات",
             monthlyVisits: "الزيارات الشهرية",
             monthlyVisitsSubtitle: "عدد الزيارات والفواتير ونسبة التحويل (الفواتير ÷ الزيارات) لكل شهر",
+            weeklySales: "المبيعات الأسبوعية",
+            weeklySalesSubtitle: "مبيعات المندوب لكل أسبوع (السبت – الجمعة) في الفترة المختارة",
+            week: "الأسبوع",
+            weekCustomers: "العملاء",
+            weekShare: "النسبة من الإجمالي",
+            weekChange: "التغير عن الأسبوع السابق",
             month: "الشهر",
             invoicesCount: "الفواتير",
             newCustomers: "العملاء الجدد",
@@ -8479,6 +8516,12 @@ const TRANSLATIONS = {
             visitConversion: "Visit Conversion",
             monthlyVisits: "Monthly Visits",
             monthlyVisitsSubtitle: "Visits, invoices and conversion rate (invoices ÷ visits) per month",
+            weeklySales: "Weekly Sales",
+            weeklySalesSubtitle: "Salesman sales per week (Saturday – Friday) in the selected period",
+            week: "Week",
+            weekCustomers: "Customers",
+            weekShare: "Share of Total",
+            weekChange: "Change vs Previous Week",
             month: "Month",
             invoicesCount: "Invoices",
             newCustomers: "New Customers",
@@ -21776,6 +21819,9 @@ window.DashboardProfiles = (() => {
             ? forecastModule.forSalesman(getTargetCode(targetRow) || code)
             : null;
 
+        profile.weekly = buildWeeklySales(codes);
+        renderWeeklySales(profile.weekly);
+
         const mixContent = utils.byId("profileMixContent");
 
         if (mixContent) {
@@ -21800,6 +21846,201 @@ window.DashboardProfiles = (() => {
                       : `${pct(forecast.forecastPct)} of ${forecast.monthLabel} target`)
                 : ""
         );
+    }
+
+    /* =====================================================
+       المبيعات الأسبوعية (الأسبوع: السبت – الجمعة)
+    ===================================================== */
+
+    function weekStartOf(date) {
+        const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        // JS: Sunday=0 ... Saturday=6 → days since last Saturday
+        start.setDate(start.getDate() - ((start.getDay() + 1) % 7));
+        return start;
+    }
+
+    function weekKey(date) {
+        const pad = n => String(n).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function buildWeeklySales(codes) {
+        const weeks = new Map();
+        let minDate = null;
+        let maxDate = null;
+
+        invoiceRows
+            .filter(row => rowBelongsToCodes(row, codes))
+            .forEach(row => {
+                const date = utils.parseDate(getInvoiceDate(row));
+
+                if (!date || isNaN(date.getTime())) {
+                    return;
+                }
+
+                if (!minDate || date < minDate) minDate = date;
+                if (!maxDate || date > maxDate) maxDate = date;
+
+                const start = weekStartOf(date);
+                const key = weekKey(start);
+
+                if (!weeks.has(key)) {
+                    const end = new Date(start);
+                    end.setDate(end.getDate() + 6);
+                    weeks.set(key, {
+                        key,
+                        start,
+                        end,
+                        sales: 0,
+                        invoices: new Set(),
+                        customers: new Set()
+                    });
+                }
+
+                const week = weeks.get(key);
+                week.sales += getInvoiceSales(row);
+
+                const invoiceNo = normalizeCode(
+                    getValue(row, ["invoiceNo", "invoiceNumber", "Invoice Number"], "")
+                );
+                if (invoiceNo) week.invoices.add(invoiceNo);
+
+                const customer = normalizeCode(
+                    getValue(row, ["customerCode", "Customer Code", "customerName", "Customer Name"], "")
+                );
+                if (customer) week.customers.add(customer);
+            });
+
+        // إضافة الأسابيع اللي مفيهاش مبيعات (صفر) بين أول وآخر أسبوع
+        const sortedKeys = Array.from(weeks.values()).sort((a, b) => a.start - b.start);
+        if (sortedKeys.length > 1) {
+            const cursor = new Date(sortedKeys[0].start);
+            const last = sortedKeys[sortedKeys.length - 1].start;
+            while (cursor < last) {
+                cursor.setDate(cursor.getDate() + 7);
+                const key = weekKey(cursor);
+                if (!weeks.has(key)) {
+                    const start = new Date(cursor);
+                    const end = new Date(start);
+                    end.setDate(end.getDate() + 6);
+                    weeks.set(key, { key, start, end, sales: 0, invoices: new Set(), customers: new Set() });
+                }
+            }
+        }
+
+        const list = Array.from(weeks.values())
+            .sort((a, b) => a.start - b.start)
+            .map(week => ({
+                key: week.key,
+                start: week.start,
+                end: week.end,
+                sales: week.sales,
+                invoices: week.invoices.size,
+                customers: week.customers.size
+            }));
+
+        const totalSales = list.reduce((sum, w) => sum + w.sales, 0);
+        const allInvoices = new Set();
+        const allCustomers = new Set();
+
+        list.forEach((week, index) => {
+            const previous = index > 0 ? list[index - 1] : null;
+            week.share = totalSales ? (week.sales / totalSales) * 100 : null;
+            week.change = previous && previous.sales
+                ? ((week.sales - previous.sales) / Math.abs(previous.sales)) * 100
+                : null;
+            // الأسبوع الحالي (لسه مخلصش)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            week.partial = week.start <= today && today <= week.end;
+        });
+
+        invoiceRows
+            .filter(row => rowBelongsToCodes(row, codes))
+            .forEach(row => {
+                const invoiceNo = normalizeCode(
+                    getValue(row, ["invoiceNo", "invoiceNumber", "Invoice Number"], "")
+                );
+                if (invoiceNo) allInvoices.add(invoiceNo);
+                const customer = normalizeCode(
+                    getValue(row, ["customerCode", "Customer Code", "customerName", "Customer Name"], "")
+                );
+                if (customer) allCustomers.add(customer);
+            });
+
+        return {
+            weeks: list,
+            totalSales,
+            totalInvoices: allInvoices.size,
+            totalCustomers: allCustomers.size,
+            average: list.length ? totalSales / list.length : 0,
+            lastDataDate: maxDate
+        };
+    }
+
+    function formatWeekRange(week, locale) {
+        const fmt = new Intl.DateTimeFormat(locale || "en-GB", { day: "2-digit", month: "short" });
+        const year = week.end.getFullYear();
+        return `${fmt.format(week.start)} – ${fmt.format(week.end)} ${year}`;
+    }
+
+    function formatWeekChange(value) {
+        if (value == null || !isFinite(value)) return "—";
+        const sign = value > 0 ? "+" : "";
+        return `${sign}${value.toFixed(1)}%`;
+    }
+
+    function renderWeeklySales(weekly) {
+        const body = utils.byId("profileWeeklyTableBody");
+
+        if (!body) {
+            return;
+        }
+
+        if (!weekly || !weekly.weeks.length) {
+            body.innerHTML = utils.emptyTableRow(
+                7,
+                utils.t("common.noData", "لا توجد بيانات متاحة")
+            );
+            return;
+        }
+
+        const isArabic = utils.getLanguage() !== "en";
+        const partialLabel = isArabic ? "(جاري)" : "(in progress)";
+        const avgLabel = isArabic ? "متوسط الأسبوع" : "Weekly average";
+
+        body.innerHTML =
+            weekly.weeks.map((week, index) => {
+                const changeClass = week.change == null ? "" : (week.change >= 0 ? "wk-up" : "wk-down");
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td dir="ltr" style="white-space:nowrap">${utils.escapeHTML(formatWeekRange(week, "en-GB"))}${week.partial ? ` <span class="wk-partial">${partialLabel}</span>` : ""}</td>
+                        <td><strong>${utils.formatCurrency(week.sales)}</strong></td>
+                        <td>${utils.formatNumber(week.invoices, 0)}</td>
+                        <td>${utils.formatNumber(week.customers, 0)}</td>
+                        <td>${week.share == null ? "—" : week.share.toFixed(1) + "%"}</td>
+                        <td dir="ltr" class="${changeClass}">${formatWeekChange(week.change)}</td>
+                    </tr>
+                `;
+            }).join("") +
+            `
+                <tr class="table-total-row">
+                    <td></td>
+                    <td><strong>${utils.escapeHTML(utils.t("common.total", "الإجمالي"))}</strong></td>
+                    <td><strong>${utils.formatCurrency(weekly.totalSales)}</strong></td>
+                    <td><strong>${utils.formatNumber(weekly.totalInvoices, 0)}</strong></td>
+                    <td><strong>${utils.formatNumber(weekly.totalCustomers, 0)}</strong></td>
+                    <td><strong>100%</strong></td>
+                    <td></td>
+                </tr>
+                <tr class="table-total-row">
+                    <td></td>
+                    <td>${avgLabel}</td>
+                    <td>${utils.formatCurrency(weekly.average)}</td>
+                    <td colspan="4"></td>
+                </tr>
+            `;
     }
 
     function formatVisitMonth(month) {
@@ -22623,6 +22864,51 @@ window.DashboardProfiles = (() => {
                                 <h2 style="margin:26px 0 10px;font-size:18px;">Sales by Product Group</h2>
                                 ${window.DashboardProductMix.tableHTML(profile.productMix, { className: "print-mix" })}
                                 ${window.DashboardProductMix.bundleHTML(profile.productMix)}
+                            </div>
+                        `
+                        : ""
+                }
+
+                ${
+                    profile.weekly && profile.weekly.weeks.length
+                        ? `
+                            <div class="trend-block">
+                                <h2 style="margin:26px 0 10px;font-size:18px;">Weekly Sales (Sat – Fri)</h2>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Week</th>
+                                            <th>Sales</th>
+                                            <th>Invoices</th>
+                                            <th>Customers</th>
+                                            <th>Share</th>
+                                            <th>vs Prev. Week</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${profile.weekly.weeks.map((week, index) => `
+                                            <tr>
+                                                <td>${index + 1}</td>
+                                                <td style="white-space:nowrap">${utils.escapeHTML(formatWeekRange(week, "en-GB"))}${week.partial ? " (in progress)" : ""}</td>
+                                                <td>${utils.formatCurrency(week.sales)}</td>
+                                                <td>${utils.formatNumber(week.invoices, 0)}</td>
+                                                <td>${utils.formatNumber(week.customers, 0)}</td>
+                                                <td>${week.share == null ? "—" : week.share.toFixed(1) + "%"}</td>
+                                                <td>${formatWeekChange(week.change)}</td>
+                                            </tr>
+                                        `).join("")}
+                                        <tr>
+                                            <td></td>
+                                            <td><strong>Total</strong></td>
+                                            <td><strong>${utils.formatCurrency(profile.weekly.totalSales)}</strong></td>
+                                            <td><strong>${utils.formatNumber(profile.weekly.totalInvoices, 0)}</strong></td>
+                                            <td><strong>${utils.formatNumber(profile.weekly.totalCustomers, 0)}</strong></td>
+                                            <td><strong>100%</strong></td>
+                                            <td>Avg/week: ${utils.formatCurrency(profile.weekly.average)}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         `
                         : ""
