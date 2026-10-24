@@ -7413,6 +7413,18 @@ body.cash-disabled [data-cash-feature]{display:none !important;}
                             <button
                                 class="report-card"
                                 type="button"
+                                data-report="receivables"
+                            >
+                                <i class="fa-solid fa-scale-unbalanced"></i>
+
+                                <span data-i18n="reports.receivablesReport">
+                                    تقرير المستحقات والمتأخرات (مجمع)
+                                </span>
+                            </button>
+
+                            <button
+                                class="report-card"
+                                type="button"
                                 data-report="target"
                             >
                                 <i class="fa-solid fa-bullseye"></i>
@@ -8280,6 +8292,7 @@ const TRANSLATIONS = {
             salesReport: "تقرير المبيعات",
             collectionsReport: "تقرير تحصيل الكرديت",
             cashReport: "تقرير التحصيل الكاش",
+            receivablesReport: "تقرير المستحقات والمتأخرات (مجمع)",
             overdueReport: "تقرير المتأخرات",
             targetReport: "تقرير تحقيق الأهداف",
             salesmanReport: "تقرير المندوب",
@@ -8712,6 +8725,7 @@ const TRANSLATIONS = {
             salesReport: "Sales Report",
             collectionsReport: "Credit Collections Report",
             cashReport: "Cash Collections Report",
+            receivablesReport: "Due & Overdue Report (Consolidated)",
             overdueReport: "Overdue Report",
             targetReport: "Target Achievement Report",
             salesmanReport: "Salesman Report",
@@ -29347,6 +29361,12 @@ window.DashboardReports = (() => {
             return true;
         }
 
+        /* تقرير المستحقات والمتأخرات المجمع */
+        if (type === "receivables" && window.DashboardReceivablesReport) {
+            window.DashboardReceivablesReport.open();
+            return true;
+        }
+
         /* تقرير الفرع الشامل */
         if (type === "branch" && window.DashboardBranchReport) {
             window.DashboardBranchReport.open();
@@ -34137,6 +34157,716 @@ ${selected.length || !selection ? body : `<p class="empty">${esc(t.noData)}</p>`
 
 </script>
 <script>
+/* ===== receivables-report.js ===== */
+"use strict";
+
+/*
+ * تقرير المستحقات والمتأخرات المجمع
+ * - المتأخرات: لكل فرع مقسمة على فترات التأخير، ولكل عميل المبلغ وأيام التأخير
+ * - المستحقات (لسه ما تأخرتش): العميل مرة واحدة بإجمالي المبلغ،
+ *   وأقرب تاريخ استحقاق والمبلغ المستحق في التاريخ ده
+ * الأرصدة دائمًا حالية (بفلتر الفرع/المندوب فقط، بدون فلتر التاريخ).
+ */
+window.DashboardReceivablesReport = (() => {
+    const utils = window.DashboardUtils;
+
+    const TEXT = {
+        ar: {
+            title: "تقرير المستحقات والمتأخرات",
+            note: "الأرصدة الحالية حسب تاريخ الاستحقاق • بدون كود 998 • المبالغ بالريال السعودي",
+            chooseBranch: "الفرع",
+            allBranches: "كل الفروع",
+            print: "طباعة / PDF",
+            excel: "تصدير Excel",
+            noData: "لا توجد بيانات متاحة",
+            generated: "تاريخ التقرير",
+            scope: "النطاق",
+            totalReceivables: "إجمالي المديونية",
+            totalOverdue: "إجمالي المتأخرات",
+            overdueShare: "نسبة المتأخر",
+            totalDue: "إجمالي المستحق (لم يتأخر)",
+            overdueCustomers: "عملاء عليهم متأخرات",
+            dueNext7: "يستحق خلال 7 أيام",
+            dueNext30: "يستحق خلال 30 يوم",
+            overdueByBranch: "المتأخرات حسب الفرع وفترات التأخير",
+            overdueCustomersTitle: "عملاء المتأخرات",
+            dueByBranch: "المستحقات حسب الفرع وموعد الاستحقاق",
+            dueCustomersTitle: "عملاء المستحقات (مجمع لكل عميل)",
+            branch: "الفرع",
+            customerCode: "كود العميل",
+            customer: "العميل",
+            salesman: "المندوب",
+            total: "الإجمالي",
+            invoices: "الفواتير",
+            customers: "العملاء",
+            maxDays: "أقصى تأخير (يوم)",
+            buckets: ["0 - 30 يوم", "31 - 60 يوم", "61 - 90 يوم", "91 - 180 يوم", "أكثر من 180 يوم"],
+            dueTotal: "إجمالي المستحق",
+            nearestDate: "أقرب تاريخ استحقاق",
+            daysLeft: "متبقي (يوم)",
+            nearestAmount: "المستحق في أقرب تاريخ",
+            within7: "خلال 7 أيام",
+            within30: "8 - 30 يوم",
+            after30: "بعد 30 يوم",
+            today: "اليوم",
+            noOverdue: "لا توجد متأخرات",
+            noDue: "لا توجد مستحقات",
+            unassigned: "غير محدد"
+        },
+        en: {
+            title: "Due & Overdue Report",
+            note: "Current balances by due date • Excludes code 998 • Amounts in SAR",
+            chooseBranch: "Branch",
+            allBranches: "All branches",
+            print: "Print / PDF",
+            excel: "Export Excel",
+            noData: "No data available",
+            generated: "Report date",
+            scope: "Scope",
+            totalReceivables: "Total receivables",
+            totalOverdue: "Total overdue",
+            overdueShare: "Overdue share",
+            totalDue: "Total due (not overdue)",
+            overdueCustomers: "Customers with overdue",
+            dueNext7: "Due within 7 days",
+            dueNext30: "Due within 30 days",
+            overdueByBranch: "Overdue by branch and aging",
+            overdueCustomersTitle: "Overdue customers",
+            dueByBranch: "Due amounts by branch and due date",
+            dueCustomersTitle: "Due customers (one line per customer)",
+            branch: "Branch",
+            customerCode: "Customer code",
+            customer: "Customer",
+            salesman: "Salesman",
+            total: "Total",
+            invoices: "Invoices",
+            customers: "Customers",
+            maxDays: "Max days overdue",
+            buckets: ["0 - 30 days", "31 - 60 days", "61 - 90 days", "91 - 180 days", "Over 180 days"],
+            dueTotal: "Total due",
+            nearestDate: "Nearest due date",
+            daysLeft: "Days left",
+            nearestAmount: "Due on nearest date",
+            within7: "Within 7 days",
+            within30: "8 - 30 days",
+            after30: "After 30 days",
+            today: "Today",
+            noOverdue: "No overdue balances",
+            noDue: "No due balances",
+            unassigned: "Unassigned"
+        }
+    };
+
+    const state = { balances: [], data: null, selected: "", lastModel: null };
+
+    const lang = () => (utils.getLanguage() === "en" ? "en" : "ar");
+    const L = () => TEXT[lang()];
+    const esc = value => utils.escapeHTML(value == null ? "" : String(value));
+    const num = value => utils.toNumber(value);
+    const clean = value => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    const key = value => clean(value).toLowerCase();
+    const intFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+    const money = value => intFormat.format(Math.round(num(value)));
+    const pct = value => (value == null || !isFinite(value) ? "—" : `${value.toFixed(1)}%`);
+
+    function todayIso() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    }
+
+    function fmtDay(value) {
+        const text = String(value || "").slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "—";
+        const [y, m, d] = text.split("-");
+        return `${d}/${m}/${y}`;
+    }
+
+    function addDays(iso, days) {
+        const [y, m, d] = iso.split("-").map(Number);
+        const date = new Date(y, m - 1, d + days);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    }
+
+    function daysBetween(fromIso, toIso) {
+        const a = fromIso.split("-").map(Number);
+        const b = toIso.split("-").map(Number);
+        return Math.round((Date.UTC(b[0], b[1] - 1, b[2]) - Date.UTC(a[0], a[1] - 1, a[2])) / 86400000);
+    }
+
+    /* أكواد مستبعدة من التقرير (998 = BLACKLISTED CUSTOMERS) */
+    const EXCLUDED_CODES = ["998"];
+    const isExcludedCode = row =>
+        [row.salesmanCode, row.originalSalesmanCode, ...(Array.isArray(row.salesmanCodes) ? row.salesmanCodes : [])]
+            .some(code => EXCLUDED_CODES.includes(clean(code).replace(/\.0+$/, "")));
+
+    const isOverdue = row => String(row.status || "").toLowerCase() === "overdue";
+
+    function bucketIndex(days) {
+        if (days <= 30) return 0;
+        if (days <= 60) return 1;
+        if (days <= 90) return 2;
+        if (days <= 180) return 3;
+        return 4;
+    }
+
+    /* تاريخ الاستحقاق: من الشيت، أو اليوم + الأيام المتبقية */
+    function dueDateOf(row, today) {
+        const direct = String(row.dueDate || "").slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(direct)) return direct;
+        const remaining = row.daysRemainingToCollect ?? row.daysUntilDue ?? row.daysToDue;
+        if (remaining !== "" && remaining != null && isFinite(Number(remaining))) {
+            return addDays(today, Number(remaining));
+        }
+        return "";
+    }
+
+    /* ---------------- model ---------------- */
+
+    function buildModel() {
+        const t = L();
+        const today = todayIso();
+        const branches = new Map();
+        const overdueCustomers = new Map();
+        const dueCustomers = new Map();
+
+        const branchOf = name => {
+            const branchName = clean(name) || t.unassigned;
+            const branchKey = key(branchName);
+            if (!branches.has(branchKey)) {
+                branches.set(branchKey, {
+                    name: branchName,
+                    buckets: [0, 0, 0, 0, 0],
+                    overdue: 0,
+                    overdueInvoices: 0,
+                    overdueCustomers: new Set(),
+                    due: 0,
+                    due7: 0,
+                    due30: 0,
+                    dueLater: 0,
+                    dueInvoices: 0,
+                    dueCustomers: new Set()
+                });
+            }
+            return branches.get(branchKey);
+        };
+
+        (state.balances || []).forEach(row => {
+            const amount = num(row.invoiceBalance);
+            if (amount <= 0) return;
+            if (isExcludedCode(row)) return;
+
+            const branch = branchOf(row.branch || row.sheetBranch);
+            const customerKey = `${key(branch.name)}|${clean(row.customerCode) || key(row.customerName)}`;
+            const base = {
+                branch: branch.name,
+                code: clean(row.customerCode),
+                name: clean(row.customerName) || clean(row.customerCode) || "—",
+                salesman: clean(row.salesmanName) || clean(row.salesmanCode)
+            };
+
+            if (isOverdue(row)) {
+                const days = Math.max(num(row.overdueDays), 0);
+                const index = bucketIndex(days);
+
+                branch.buckets[index] += amount;
+                branch.overdue += amount;
+                branch.overdueInvoices += 1;
+                branch.overdueCustomers.add(customerKey);
+
+                if (!overdueCustomers.has(customerKey)) {
+                    overdueCustomers.set(customerKey, { ...base, buckets: [0, 0, 0, 0, 0], total: 0, maxDays: 0, invoices: 0 });
+                }
+                const customer = overdueCustomers.get(customerKey);
+                customer.buckets[index] += amount;
+                customer.total += amount;
+                customer.maxDays = Math.max(customer.maxDays, days);
+                customer.invoices += 1;
+                return;
+            }
+
+            const dueDate = dueDateOf(row, today);
+            const daysLeft = dueDate ? daysBetween(today, dueDate) : null;
+
+            branch.due += amount;
+            branch.dueInvoices += 1;
+            branch.dueCustomers.add(customerKey);
+            if (daysLeft != null && daysLeft <= 7) branch.due7 += amount;
+            else if (daysLeft != null && daysLeft <= 30) branch.due30 += amount;
+            else branch.dueLater += amount;
+
+            if (!dueCustomers.has(customerKey)) {
+                dueCustomers.set(customerKey, { ...base, total: 0, invoices: 0, nearestDate: "", nearestAmount: 0 });
+            }
+            const customer = dueCustomers.get(customerKey);
+            customer.total += amount;
+            customer.invoices += 1;
+
+            if (dueDate) {
+                if (!customer.nearestDate || dueDate < customer.nearestDate) {
+                    customer.nearestDate = dueDate;
+                    customer.nearestAmount = amount;
+                } else if (dueDate === customer.nearestDate) {
+                    customer.nearestAmount += amount;
+                }
+            }
+        });
+
+        const branchList = [...branches.values()]
+            .filter(b => b.overdue || b.due)
+            .sort((a, b) => (b.overdue + b.due) - (a.overdue + a.due));
+
+        const overdueList = [...overdueCustomers.values()].sort((a, b) => b.total - a.total);
+        const dueList = [...dueCustomers.values()]
+            .map(c => ({ ...c, daysLeft: c.nearestDate ? daysBetween(today, c.nearestDate) : null }))
+            .sort((a, b) => {
+                if (!a.nearestDate && !b.nearestDate) return b.total - a.total;
+                if (!a.nearestDate) return 1;
+                if (!b.nearestDate) return -1;
+                return a.nearestDate.localeCompare(b.nearestDate) || b.nearestAmount - a.nearestAmount;
+            });
+
+        return { today, branches: branchList, overdueList, dueList };
+    }
+
+    function scoped(model, selection) {
+        if (!selection) return model;
+        const match = item => key(item.branch || item.name) === key(selection);
+        return {
+            ...model,
+            branches: model.branches.filter(match),
+            overdueList: model.overdueList.filter(match),
+            dueList: model.dueList.filter(match)
+        };
+    }
+
+    function totals(branches) {
+        const sum = field => branches.reduce((s, b) => s + b[field], 0);
+        return {
+            buckets: [0, 1, 2, 3, 4].map(i => branches.reduce((s, b) => s + b.buckets[i], 0)),
+            overdue: sum("overdue"),
+            overdueInvoices: sum("overdueInvoices"),
+            overdueCustomers: branches.reduce((s, b) => s + b.overdueCustomers.size, 0),
+            due: sum("due"),
+            due7: sum("due7"),
+            due30: sum("due30"),
+            dueLater: sum("dueLater"),
+            dueInvoices: sum("dueInvoices"),
+            dueCustomers: branches.reduce((s, b) => s + b.dueCustomers.size, 0)
+        };
+    }
+
+    /* ---------------- document ---------------- */
+
+    const table = (head, rows, footer = "", emptyText = "") => `
+        <table>
+            <thead><tr>${head.map(h => `<th class="${h.n ? "n" : ""}">${esc(h.t)}</th>`).join("")}</tr></thead>
+            <tbody>${rows.length ? rows.join("") : `<tr><td colspan="${head.length}" class="empty">${esc(emptyText || L().noData)}</td></tr>`}</tbody>
+            ${footer ? `<tfoot>${footer}</tfoot>` : ""}
+        </table>`;
+
+    function buildDocument(model, selection) {
+        const t = L();
+        const isArabic = lang() === "ar";
+        const logo = document.querySelector(".sidebar-brand-logo img")?.getAttribute("src") || "";
+        const company = document.querySelector(".sidebar-brand-text span")?.textContent?.trim() || "";
+        const view = scoped(model, selection);
+        const sum = totals(view.branches);
+        const receivables = sum.overdue + sum.due;
+        const showBranch = !selection;
+
+        const kpis = [
+            [t.totalReceivables, money(receivables)],
+            [t.totalOverdue, money(sum.overdue), "is-bad"],
+            [t.overdueShare, pct(receivables ? (sum.overdue / receivables) * 100 : null), "is-bad"],
+            [t.totalDue, money(sum.due)],
+            [t.dueNext7, money(sum.due7), "is-warn"],
+            [t.overdueCustomers, money(view.overdueList.length)]
+        ];
+
+        /* 1) المتأخرات حسب الفرع */
+        const overdueBranchRows = view.branches.filter(b => b.overdue).map(b => `
+            <tr>
+                <td class="strong">${esc(b.name)}</td>
+                ${b.buckets.map((v, i) => `<td class="n ${i >= 3 && v ? "bad" : ""}">${v ? money(v) : "—"}</td>`).join("")}
+                <td class="n strong">${money(b.overdue)}</td>
+                <td class="n">${pct(b.overdue + b.due ? (b.overdue / (b.overdue + b.due)) * 100 : null)}</td>
+                <td class="n">${money(b.overdueCustomers.size)}</td>
+                <td class="n">${money(b.overdueInvoices)}</td>
+            </tr>`);
+        const overdueBranchFooter = `
+            <tr>
+                <td>${esc(t.total)}</td>
+                ${sum.buckets.map(v => `<td class="n">${money(v)}</td>`).join("")}
+                <td class="n">${money(sum.overdue)}</td>
+                <td class="n">${pct(receivables ? (sum.overdue / receivables) * 100 : null)}</td>
+                <td class="n">${money(view.overdueList.length)}</td>
+                <td class="n">${money(sum.overdueInvoices)}</td>
+            </tr>`;
+        const bucketShare = sum.overdue
+            ? `<div class="bucket-bar">${sum.buckets.map((v, i) => v ? `<i class="b${i}" style="flex:${v}" title="${esc(t.buckets[i])}"></i>` : "").join("")}</div>
+               <div class="bucket-legend">${sum.buckets.map((v, i) => `<span><i class="b${i}"></i>${esc(t.buckets[i])}: <b>${pct((v / sum.overdue) * 100)}</b></span>`).join("")}</div>`
+            : "";
+
+        /* 2) عملاء المتأخرات */
+        const overdueCustomerRows = view.overdueList.map((c, index) => `
+            <tr class="${c.maxDays > 90 ? "risk" : ""}">
+                <td class="n muted">${index + 1}</td>
+                <td><bdi dir="ltr">${esc(c.code || "—")}</bdi></td>
+                <td class="wrap strong">${esc(c.name)}</td>
+                ${showBranch ? `<td>${esc(c.branch)}</td>` : ""}
+                <td class="sm">${esc(c.salesman)}</td>
+                ${c.buckets.map(v => `<td class="n">${v ? money(v) : "—"}</td>`).join("")}
+                <td class="n strong bad">${money(c.total)}</td>
+                <td class="n strong">${money(c.maxDays)}</td>
+                <td class="n">${money(c.invoices)}</td>
+            </tr>`);
+        const overdueCustomerFooter = view.overdueList.length ? `
+            <tr>
+                <td></td><td colspan="${showBranch ? 4 : 3}">${esc(t.total)} (${money(view.overdueList.length)} ${esc(t.customers)})</td>
+                ${sum.buckets.map(v => `<td class="n">${money(v)}</td>`).join("")}
+                <td class="n">${money(sum.overdue)}</td><td></td>
+                <td class="n">${money(sum.overdueInvoices)}</td>
+            </tr>` : "";
+
+        /* 3) المستحقات حسب الفرع */
+        const dueBranchRows = view.branches.filter(b => b.due).map(b => `
+            <tr>
+                <td class="strong">${esc(b.name)}</td>
+                <td class="n">${money(b.due7)}</td>
+                <td class="n">${money(b.due30)}</td>
+                <td class="n">${money(b.dueLater)}</td>
+                <td class="n strong">${money(b.due)}</td>
+                <td class="n">${money(b.dueCustomers.size)}</td>
+                <td class="n">${money(b.dueInvoices)}</td>
+            </tr>`);
+        const dueBranchFooter = `
+            <tr>
+                <td>${esc(t.total)}</td>
+                <td class="n">${money(sum.due7)}</td>
+                <td class="n">${money(sum.due30)}</td>
+                <td class="n">${money(sum.dueLater)}</td>
+                <td class="n">${money(sum.due)}</td>
+                <td class="n">${money(view.dueList.length)}</td>
+                <td class="n">${money(sum.dueInvoices)}</td>
+            </tr>`;
+
+        /* 4) عملاء المستحقات (مجمع) */
+        const dueCustomerRows = view.dueList.map((c, index) => {
+            const soon = c.daysLeft != null && c.daysLeft <= 7;
+            return `
+            <tr class="${soon ? "soon" : ""}">
+                <td class="n muted">${index + 1}</td>
+                <td><bdi dir="ltr">${esc(c.code || "—")}</bdi></td>
+                <td class="wrap strong">${esc(c.name)}</td>
+                ${showBranch ? `<td>${esc(c.branch)}</td>` : ""}
+                <td class="sm">${esc(c.salesman)}</td>
+                <td class="n strong">${money(c.total)}</td>
+                <td class="n">${esc(fmtDay(c.nearestDate))}</td>
+                <td class="n ${soon ? "warn" : ""}">${c.daysLeft == null ? "—" : c.daysLeft === 0 ? esc(t.today) : money(c.daysLeft)}</td>
+                <td class="n strong">${c.nearestDate ? money(c.nearestAmount) : "—"}</td>
+                <td class="n">${money(c.invoices)}</td>
+            </tr>`;
+        });
+        const dueCustomerFooter = view.dueList.length ? `
+            <tr>
+                <td></td><td colspan="${showBranch ? 4 : 3}">${esc(t.total)} (${money(view.dueList.length)} ${esc(t.customers)})</td>
+                <td class="n">${money(sum.due)}</td><td></td><td></td>
+                <td></td>
+                <td class="n">${money(sum.dueInvoices)}</td>
+            </tr>` : "";
+
+        const docTitle = `Due-Overdue-Report_${selection ? selection.replace(/\s+/g, "-") : "All"}_${model.today}`;
+
+        return `<!DOCTYPE html>
+<html lang="${isArabic ? "ar" : "en"}" dir="${isArabic ? "rtl" : "ltr"}">
+<head>
+<meta charset="UTF-8">
+<title>${esc(docTitle)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 landscape; margin: 10mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: ${isArabic ? '"Cairo", "Inter"' : '"Inter", "Cairo"'}, "Segoe UI", Tahoma, sans-serif;
+    color: #0c2e42; font-size: 11px; font-variant-numeric: tabular-nums;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    background: #fff; padding: 14px;
+}
+@media print { body { padding: 0; } }
+header.doc { display: flex; align-items: center; gap: 14px; padding-bottom: 8px; border-bottom: 2px solid #0c2e42; margin-bottom: 10px; }
+header.doc img { height: 40px; }
+header.doc h1 { font-size: 20px; font-weight: 800; }
+header.doc p { color: #5b6b78; font-size: 11px; }
+header.doc dl { margin-inline-start: auto; display: grid; grid-template-columns: auto auto; gap: 2px 10px; font-size: 10.5px; }
+header.doc dt { color: #5b6b78; } header.doc dd { font-weight: 700; }
+.section-title { background: #0c2e42; color: #fff; padding: 6px 12px; margin: 14px 0 8px; font-size: 14px; font-weight: 800; break-after: avoid; }
+.section-title.is-bad { background: #8f2a1f; }
+.new-page { break-before: page; page-break-before: always; }
+.kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.kpi { border: 1px solid #dfe6ec; border-top: 3px solid #1c95b8; padding: 5px 8px; break-inside: avoid; }
+.kpi span { display: block; color: #5b6b78; font-size: 10px; }
+.kpi strong { display: block; font-size: 15px; font-weight: 800; font-family: "Inter", "Cairo", sans-serif; }
+.kpi.is-bad { border-top-color: #c0392b; } .kpi.is-bad strong { color: #c0392b; }
+.kpi.is-warn { border-top-color: #c98a12; } .kpi.is-warn strong { color: #a8700a; }
+table { width: 100%; border-collapse: collapse; }
+thead { display: table-header-group; } tfoot { display: table-row-group; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th { background: #0c2e42; color: #fff; font-weight: 700; padding: 5px 6px; text-align: start; white-space: nowrap; font-size: 10.5px; }
+td { padding: 4px 6px; border-bottom: 1px solid #e6ecf1; white-space: nowrap; }
+tbody tr:nth-child(even) td { background: #f5f8fa; }
+tfoot td { font-weight: 800; background: #e8f1f5; border-top: 2px solid #0c2e42; }
+tr.risk td { background: #fbeeec !important; }
+tr.soon td { background: #fff6e5 !important; }
+.n { text-align: end; } .strong { font-weight: 700; } .muted { color: #8595a2; }
+.bad { color: #c0392b; } .warn { color: #a8700a; font-weight: 700; }
+td.wrap { white-space: normal; overflow-wrap: anywhere; min-width: 160px; }
+td.sm { white-space: normal; max-width: 150px; font-size: 10px; }
+.empty { text-align: center; color: #8595a2; padding: 10px; }
+.bucket-bar { display: flex; height: 10px; margin: 8px 0 4px; border-radius: 2px; overflow: hidden; background: #e3eaef; }
+.bucket-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 10px; color: #5b6b78; }
+.bucket-legend i { display: inline-block; width: 9px; height: 9px; margin-inline-end: 4px; vertical-align: -1px; }
+.b0 { background: #e8b04a; } .b1 { background: #df8a3c; } .b2 { background: #d4652f; } .b3 { background: #b8412a; } .b4 { background: #7e2219; }
+.hint { color: #8595a2; font-size: 9.5px; margin-top: 4px; }
+footer.doc { margin-top: 10px; color: #8595a2; font-size: 9.5px; border-top: 1px solid #dfe6ec; padding-top: 5px; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<header class="doc">
+    ${logo ? `<img src="${esc(logo)}" alt="">` : ""}
+    <div>
+        <h1>${esc(t.title)}${selection ? ` — ${esc(selection)}` : ""}</h1>
+        <p>${esc(company)}</p>
+    </div>
+    <dl>
+        <dt>${esc(t.scope)}</dt><dd>${esc(selection || t.allBranches)}</dd>
+        <dt>${esc(t.generated)}</dt><dd>${esc(fmtDay(model.today))}</dd>
+    </dl>
+</header>
+
+<div class="kpis">${kpis.map(([label, value, cls]) => `<div class="kpi ${cls || ""}"><span>${esc(label)}</span><strong>${value}</strong></div>`).join("")}</div>
+
+<div class="section-title is-bad">${esc(t.overdueByBranch)}</div>
+${table(
+    [{ t: t.branch }, ...t.buckets.map(b => ({ t: b, n: 1 })), { t: t.totalOverdue, n: 1 }, { t: t.overdueShare, n: 1 }, { t: t.customers, n: 1 }, { t: t.invoices, n: 1 }],
+    overdueBranchRows,
+    overdueBranchRows.length ? overdueBranchFooter : "",
+    t.noOverdue
+)}
+${bucketShare}
+
+<div class="section-title is-bad">${esc(t.overdueCustomersTitle)}</div>
+${table(
+    [{ t: "#", n: 1 }, { t: t.customerCode }, { t: t.customer }, ...(showBranch ? [{ t: t.branch }] : []), { t: t.salesman },
+     ...t.buckets.map(b => ({ t: b, n: 1 })), { t: t.total, n: 1 }, { t: t.maxDays, n: 1 }, { t: t.invoices, n: 1 }],
+    overdueCustomerRows,
+    overdueCustomerFooter,
+    t.noOverdue
+)}
+
+<div class="section-title new-page">${esc(t.dueByBranch)}</div>
+${table(
+    [{ t: t.branch }, { t: t.within7, n: 1 }, { t: t.within30, n: 1 }, { t: t.after30, n: 1 }, { t: t.dueTotal, n: 1 }, { t: t.customers, n: 1 }, { t: t.invoices, n: 1 }],
+    dueBranchRows,
+    dueBranchRows.length ? dueBranchFooter : "",
+    t.noDue
+)}
+
+<div class="section-title">${esc(t.dueCustomersTitle)}</div>
+${table(
+    [{ t: "#", n: 1 }, { t: t.customerCode }, { t: t.customer }, ...(showBranch ? [{ t: t.branch }] : []), { t: t.salesman },
+     { t: t.dueTotal, n: 1 }, { t: t.nearestDate, n: 1 }, { t: t.daysLeft, n: 1 }, { t: t.nearestAmount, n: 1 }, { t: t.invoices, n: 1 }],
+    dueCustomerRows,
+    dueCustomerFooter,
+    t.noDue
+)}
+
+<footer class="doc"><span>${esc(company)}</span><span>${esc(t.note)}</span></footer>
+</body>
+</html>`;
+    }
+
+    /* ---------------- Excel ---------------- */
+
+    function exportExcel() {
+        const t = L();
+        if (!window.XLSX?.utils) {
+            utils.showToast(t.noData, "warning");
+            return;
+        }
+
+        const view = scoped(state.lastModel || buildModel(), state.selected);
+        const workbook = window.XLSX.utils.book_new();
+        const add = (name, rows) => {
+            if (rows.length) window.XLSX.utils.book_append_sheet(workbook, window.XLSX.utils.json_to_sheet(rows), name.slice(0, 31));
+        };
+        const bucketCols = buckets => Object.fromEntries(t.buckets.map((label, i) => [label, Math.round(buckets[i])]));
+
+        add("Overdue by Branch", view.branches.filter(b => b.overdue).map(b => ({
+            [t.branch]: b.name,
+            ...bucketCols(b.buckets),
+            [t.totalOverdue]: Math.round(b.overdue),
+            [t.customers]: b.overdueCustomers.size,
+            [t.invoices]: b.overdueInvoices
+        })));
+
+        add("Overdue Customers", view.overdueList.map(c => ({
+            [t.customerCode]: c.code,
+            [t.customer]: c.name,
+            [t.branch]: c.branch,
+            [t.salesman]: c.salesman,
+            ...bucketCols(c.buckets),
+            [t.total]: Math.round(c.total),
+            [t.maxDays]: c.maxDays,
+            [t.invoices]: c.invoices
+        })));
+
+        add("Due by Branch", view.branches.filter(b => b.due).map(b => ({
+            [t.branch]: b.name,
+            [t.within7]: Math.round(b.due7),
+            [t.within30]: Math.round(b.due30),
+            [t.after30]: Math.round(b.dueLater),
+            [t.dueTotal]: Math.round(b.due),
+            [t.customers]: b.dueCustomers.size,
+            [t.invoices]: b.dueInvoices
+        })));
+
+        add("Due Customers", view.dueList.map(c => ({
+            [t.customerCode]: c.code,
+            [t.customer]: c.name,
+            [t.branch]: c.branch,
+            [t.salesman]: c.salesman,
+            [t.dueTotal]: Math.round(c.total),
+            [t.nearestDate]: c.nearestDate || "",
+            [t.daysLeft]: c.daysLeft == null ? "" : c.daysLeft,
+            [t.nearestAmount]: c.nearestDate ? Math.round(c.nearestAmount) : "",
+            [t.invoices]: c.invoices
+        })));
+
+        if (!workbook.SheetNames.length) {
+            utils.showToast(t.noData, "warning");
+            return;
+        }
+
+        window.XLSX.writeFile(workbook, `Due-Overdue-Report_${state.selected || "All"}_${todayIso()}.xlsx`);
+    }
+
+    /* ---------------- modal ---------------- */
+
+    function render() {
+        const frame = utils.byId("receivablesReportFrame");
+        if (!frame) return;
+        const model = buildModel();
+        state.lastModel = model;
+        frame.srcdoc = buildDocument(model, state.selected);
+    }
+
+    function print() {
+        const frame = utils.byId("receivablesReportFrame");
+        const view = frame?.contentWindow;
+        if (!view) return;
+        const run = () => {
+            try { view.focus(); view.print(); } catch (error) { console.error(error); }
+        };
+        const ready = frame.contentDocument?.fonts?.ready;
+        if (ready) ready.then(run).catch(run);
+        else run();
+    }
+
+    function close() {
+        utils.byId("receivablesReportModal")?.remove();
+    }
+
+    function open() {
+        const t = L();
+        close();
+
+        const model = buildModel();
+        if (!model.branches.length) {
+            utils.showToast(t.noData, "warning");
+            return;
+        }
+
+        const filterBranch = clean(state.data?.filters?.branch);
+        state.selected = filterBranch && model.branches.some(b => key(b.name) === key(filterBranch))
+            ? model.branches.find(b => key(b.name) === key(filterBranch)).name
+            : "";
+
+        const modal = document.createElement("div");
+        modal.id = "receivablesReportModal";
+        modal.className = "report-preview-overlay";
+        modal.innerHTML = `
+            <section class="report-preview-card branch-report-card">
+                <header class="report-preview-header">
+                    <div>
+                        <h2>${esc(t.title)}</h2>
+                        <p>${esc(t.note)}</p>
+                    </div>
+                    <button type="button" class="icon-button" data-rr="close" aria-label="Close">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </header>
+
+                <div class="report-preview-actions branch-report-actions">
+                    <label class="branch-report-select">
+                        <span>${esc(t.chooseBranch)}</span>
+                        <select id="receivablesReportSelect">
+                            <option value="">${esc(t.allBranches)}</option>
+                            ${model.branches.map(b => `<option value="${esc(b.name)}" ${key(b.name) === key(state.selected) ? "selected" : ""}>${esc(b.name)}</option>`).join("")}
+                        </select>
+                    </label>
+                    <span style="flex:1"></span>
+                    <button class="secondary-button" type="button" data-rr="excel">
+                        <i class="fa-solid fa-file-excel"></i><span>${esc(t.excel)}</span>
+                    </button>
+                    <button class="primary-button" type="button" data-rr="print">
+                        <i class="fa-solid fa-print"></i><span>${esc(t.print)}</span>
+                    </button>
+                </div>
+
+                <iframe id="receivablesReportFrame" class="branch-report-frame" title="${esc(t.title)}"></iframe>
+            </section>`;
+
+        document.body.appendChild(modal);
+
+        modal.addEventListener("click", event => {
+            if (event.target === modal) {
+                close();
+                return;
+            }
+            const action = event.target.closest("[data-rr]")?.dataset.rr;
+            if (action === "close") close();
+            if (action === "print") print();
+            if (action === "excel") exportExcel();
+        });
+
+        utils.byId("receivablesReportSelect")?.addEventListener("change", event => {
+            state.selected = event.target.value;
+            render();
+        });
+
+        document.addEventListener("keydown", function onKey(event) {
+            if (event.key === "Escape") {
+                close();
+                document.removeEventListener("keydown", onKey);
+            }
+        });
+
+        render();
+    }
+
+    function setData(data, balances) {
+        state.data = data || null;
+        state.balances = Array.isArray(balances) ? balances : (data?.dueOverdue || []);
+        if (utils.byId("receivablesReportModal")) render();
+    }
+
+    return Object.freeze({ open, close, setData, render, print, exportExcel, buildModel });
+})();
+
+</script>
+<script>
 /* ===== training.js ===== */
 "use strict";
 
@@ -36735,6 +37465,13 @@ window.DashboardApp = (() => {
 
         callModule(
             window.DashboardBranchReport,
+            "setData",
+            data,
+            profileDueOverdue
+        );
+
+        callModule(
+            window.DashboardReceivablesReport,
             "setData",
             data,
             profileDueOverdue
