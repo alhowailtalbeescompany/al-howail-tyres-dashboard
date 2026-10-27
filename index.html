@@ -35590,6 +35590,21 @@ window.DashboardMonthlyReport = (() => {
             value: "القيمة",
             avg: "متوسط سعر القطعة",
             topOverdue: "أعلى 10 عملاء متأخرات (الرصيد الحالي)",
+            gapTitle: "أكبر أسباب العجز",
+            gapLead: (n, gap, share) => `${n === 1 ? "مندوب واحد عجزه" : `${n} مندوبين عجزهم`} المتوقع ${gap}، يعني ${share} من عجز النطاق ده.`,
+            gapLeadFinal: (n, gap, share) => `${n === 1 ? "مندوب واحد عجزه" : `${n} مندوبين عجزهم`} ${gap}، يعني ${share} من عجز النطاق ده.`,
+            gap: "العجز المتوقع",
+            gapFinal: "العجز",
+            dailyNow: "البيع اليومي",
+            dailyNeed: "المطلوب يومياً",
+            overdue90: "متأخر +90 يوم",
+            topCustomer: "أكبر عميل متأخر",
+            signal: "الإشارة",
+            sigOverdueHigh: "المتأخرات أكبر من مبيعات الشهر",
+            sigOld: "مديونية قديمة +90 يوم",
+            sigSelling: "مشكلة بيع مش مديونية (زيارات / عملاء)",
+            sigFewInvoices: n => `${n} فواتير بس`,
+            noGap: "مفيش عجز عند المندوبين في النطاق ده",
             customer: "العميل",
             balance: "الرصيد",
             days: "أيام التأخير",
@@ -35655,6 +35670,21 @@ window.DashboardMonthlyReport = (() => {
             value: "Value",
             avg: "Avg price / piece",
             topOverdue: "Top 10 overdue customers (current balance)",
+            gapTitle: "Biggest gap drivers",
+            gapLead: (n, gap, share) => `${n} salesmen account for an expected gap of ${gap}, ${share} of this scope's gap.`,
+            gapLeadFinal: (n, gap, share) => `${n} salesmen account for a gap of ${gap}, ${share} of this scope's gap.`,
+            gap: "Expected gap",
+            gapFinal: "Gap",
+            dailyNow: "Daily now",
+            dailyNeed: "Needed daily",
+            overdue90: "Overdue 90+ days",
+            topCustomer: "Largest overdue customer",
+            signal: "Signal",
+            sigOverdueHigh: "Overdue exceeds month sales",
+            sigOld: "Old debt 90+ days",
+            sigSelling: "Selling problem, not debt (visits / customers)",
+            sigFewInvoices: n => `Only ${n} invoices`,
+            noGap: "No salesman gap in this scope",
             customer: "Customer",
             balance: "Balance",
             days: "Days late",
@@ -35785,7 +35815,10 @@ window.DashboardMonthlyReport = (() => {
                 branch: clean(row.branch) || t.unassigned,
                 target,
                 sales: 0,
-                overdue: 0
+                overdue: 0,
+                overdue90: 0,
+                invoiceSet: new Set(),
+                overdueCustomers: new Map()
             });
         });
 
@@ -35822,7 +35855,10 @@ window.DashboardMonthlyReport = (() => {
             });
 
             const salesman = salesmanOf(row.salesmanCode);
-            if (salesman) salesman.sales += amount;
+            if (salesman) {
+                salesman.sales += amount;
+                if (row.invoiceNo) salesman.invoiceSet.add(clean(row.invoiceNo));
+            }
         });
 
         (data.collections || []).forEach(row => {
@@ -35861,7 +35897,15 @@ window.DashboardMonthlyReport = (() => {
             });
 
             const salesman = salesmanOf(row.salesmanCode);
-            if (salesman && isOverdue) salesman.overdue += amount;
+            if (salesman && isOverdue) {
+                salesman.overdue += amount;
+                if (num(row.overdueDays) > 90) salesman.overdue90 += amount;
+                const customerKey = clean(row.customerCode) || clean(row.customerName);
+                const entry = salesman.overdueCustomers.get(customerKey) || { name: clean(row.customerName), amount: 0, days: 0 };
+                entry.amount += amount;
+                entry.days = Math.max(entry.days, num(row.overdueDays));
+                salesman.overdueCustomers.set(customerKey, entry);
+            }
         });
 
         const workingDays = (from, to) => {
@@ -35885,6 +35929,37 @@ window.DashboardMonthlyReport = (() => {
             };
         };
 
+        const remainingDays = Math.max(totalDays - elapsed, 0);
+
+        const invoiceCounts = [...salesmen.values()].filter(s => s.target > 0).map(s => s.invoiceSet.size).sort((x, y) => x - y);
+        const medianInvoices = invoiceCounts.length ? invoiceCounts[Math.floor(invoiceCounts.length / 2)] : 0;
+
+        const gapDrivers = (isCompany, scopeName) => {
+            const list = [...salesmen.values()]
+                .filter(s => (isCompany || s.branch === scopeName) && s.target > 0)
+                .map(s => {
+                    const p = project(s.sales, s.target);
+                    const top = [...s.overdueCustomers.values()].sort((x, y) => y.amount - x.amount)[0] || null;
+                    const invoices = s.invoiceSet.size;
+                    const signals = [];
+                    if (s.overdue > s.sales && s.overdue > 0) signals.push("overdueHigh");
+                    if (s.overdue90 > 0) signals.push("old");
+                    if (!signals.length && s.overdue90 < s.target * 0.1) signals.push("selling");
+                    if (medianInvoices > 0 && invoices < medianInvoices * 0.5) signals.push("few");
+                    return {
+                        code: s.code, name: s.name, branch: s.branch, target: s.target, sales: s.sales,
+                        achievedPct: p.achievedPct, forecastPct: p.forecastPct,
+                        gap: Math.max(s.target - p.forecast, 0),
+                        dailyNow: s.sales / elapsed,
+                        dailyNeed: remainingDays > 0 ? Math.max(s.target - s.sales, 0) / remainingDays : null,
+                        overdue: s.overdue, overdue90: s.overdue90, invoices, top, signals
+                    };
+                })
+                .filter(d => d.gap > 0)
+                .sort((x, y) => y.gap - x.gap);
+            return list;
+        };
+
         const finalize = (scope, isCompany) => ({
             ...scope,
             ...project(scope.targetedSales, scope.target),
@@ -35897,6 +35972,7 @@ window.DashboardMonthlyReport = (() => {
             otherCodeList: [...scope.otherCodes.values()]
                 .map(entry => ({ ...entry, invoiceCount: entry.invoices.size }))
                 .sort((a, b) => b.sales - a.sales),
+            gapDrivers: gapDrivers(isCompany, scope.name),
             salesmen: [...salesmen.values()]
                 .filter(s => (isCompany || s.branch === scope.name) && s.target > 0)
                 .map(s => ({ ...s, ...project(s.target > 0 ? s.sales : 0, s.target) }))
@@ -35998,6 +36074,30 @@ window.DashboardMonthlyReport = (() => {
                 ${closed ? "" : `<td class="n ${tone(s.forecastPct)}">${pct(s.forecastPct)}</td>`}
                 <td class="n">${money(s.overdue)}</td></tr>`));
 
+        const drivers = (scope.gapDrivers || []).slice(0, isConsolidated ? 8 : 6);
+        const driversGap = drivers.reduce((sum, d) => sum + d.gap, 0);
+        const scopeGap = Math.max(scope.target - scope.forecast, 0);
+        const signalText = d => d.signals.map(sig =>
+            sig === "overdueHigh" ? t.sigOverdueHigh
+            : sig === "old" ? t.sigOld
+            : sig === "selling" ? t.sigSelling
+            : t.sigFewInvoices(d.invoices)).join(" • ");
+        const gapTable = `<h3>${esc(t.gapTitle)}</h3>` + (drivers.length
+            ? `<p class="lead">${esc((closed ? t.gapLeadFinal : t.gapLead)(drivers.length, money(driversGap), scopeGap > 0 ? pct((driversGap / scopeGap) * 100) : "—"))}</p>` + table(
+                [{ t: t.salesman }, ...(isConsolidated ? [{ t: t.branch }] : []), { t: t.achieved, n: 1 }, { t: closed ? t.gapFinal : t.gap, n: 1 },
+                 ...(closed ? [] : [{ t: t.dailyNow, n: 1 }, { t: t.dailyNeed, n: 1 }]),
+                 { t: t.overdue, n: 1 }, { t: t.overdue90, n: 1 }, { t: t.topCustomer }],
+                drivers.map(d => `<tr>
+                    <td class="strong">${esc(d.name)}${d.signals.length ? `<small class="sig">${esc(signalText(d))}</small>` : ""}</td>
+                    ${isConsolidated ? `<td>${esc(d.branch)}</td>` : ""}
+                    <td class="n ${tone(d.achievedPct)}">${pct(d.achievedPct)}</td>
+                    <td class="n bad strong">${money(d.gap)}</td>
+                    ${closed ? "" : `<td class="n">${money(d.dailyNow)}</td><td class="n">${d.dailyNeed == null ? "—" : money(d.dailyNeed)}${d.dailyNeed != null && d.dailyNow > 0 ? `<small> ×${(d.dailyNeed / d.dailyNow).toFixed(1)}</small>` : ""}</td>`}
+                    <td class="n">${money(d.overdue)}</td>
+                    <td class="n ${d.overdue90 ? "bad" : ""}">${d.overdue90 ? money(d.overdue90) : "—"}</td>
+                    <td class="wrap">${d.top ? `${esc(d.top.name)}<small>${money(d.top.amount)} • ${money(d.top.days)} ${esc(lang() === "ar" ? "يوم" : "days")}</small>` : "—"}</td></tr>`))
+            : `<p class="lead">${esc(t.noGap)}</p>`);
+
         const otherTable = scope.otherCodeList.length
             ? `<h3>${esc(t.otherCodes)}</h3>` + table(
                 [{ t: t.code }, { t: t.salesman }, ...(isConsolidated ? [{ t: t.branch }] : []), { t: t.invoices, n: 1 }, { t: t.sales, n: 1 }],
@@ -36044,6 +36144,7 @@ window.DashboardMonthlyReport = (() => {
                 ${branchTable}
                 <h3>${esc(isConsolidated ? t.salesmen : t.branchSalesmen)}</h3>
                 ${salesmenTable}
+                ${gapTable}
                 ${otherTable}
                 ${mix}
                 ${overdueTable}
@@ -36109,6 +36210,10 @@ tbody tr:nth-child(even) td { background: #f5f8fa; }
 td.is-good { color: #1f8a5b; font-weight: 700; } td.is-warn { color: #a8700a; font-weight: 700; } td.is-bad { color: #c0392b; font-weight: 700; }
 .empty { text-align: center; color: #8595a2; padding: 8px; }
 .note { margin-top: 10px; color: #8595a2; font-size: 9.5px; border-top: 1px solid #dfe6ec; padding-top: 5px; }
+td.wrap { white-space: normal; overflow-wrap: anywhere; min-width: 150px; max-width: 240px; }
+td small.sig { color: #a8700a; font-weight: 600; }
+td small { display: block; color: #8595a2; font-size: 9px; font-weight: 400; }
+.lead { margin: 2px 0 6px; color: #0c2e42; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -36259,6 +36364,17 @@ ${row(c, true)}
         });
 
         add("Summary", data.branches.map(scopeRow).concat([{ ...scopeRow(data.company), [t.branch]: "Total" }]));
+        add("Gap Drivers", (data.company.gapDrivers || []).map(d => ({
+            [t.salesman]: d.name,
+            [t.branch]: d.branch,
+            [t.achieved]: d.achievedPct == null ? "" : +d.achievedPct.toFixed(1),
+            [data.closed ? t.gapFinal : t.gap]: Math.round(d.gap),
+            ...(data.closed ? {} : { [t.dailyNow]: Math.round(d.dailyNow), [t.dailyNeed]: d.dailyNeed == null ? "" : Math.round(d.dailyNeed) }),
+            [t.overdue]: Math.round(d.overdue),
+            [t.overdue90]: Math.round(d.overdue90),
+            [t.topCustomer]: d.top ? `${d.top.name} (${Math.round(d.top.amount)} / ${d.top.days})` : "",
+            [t.signal]: d.signals.map(sig => sig === "overdueHigh" ? t.sigOverdueHigh : sig === "old" ? t.sigOld : sig === "selling" ? t.sigSelling : t.sigFewInvoices(d.invoices)).join(" • ")
+        })));
         add("Salesmen", data.company.salesmen.map(s => ({
             [t.salesman]: s.name,
             [t.branch]: s.branch,
