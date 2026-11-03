@@ -4802,6 +4802,9 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
 .dbc-sort { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
 .dbc-sort select { min-height: 38px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-primary); font: inherit; }
 .dbc-empty { margin: 0; padding: 12px 0; color: var(--text-secondary); }
+.dbc-blacklist { opacity: .75; border-top: 1px dashed var(--border-strong); border-bottom: 0; }
+.dbc-blacklist .dbc-meter .dbc-track i { background: var(--text-muted); }
+.dbc-note { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); }
 </style>
 </head>
 
@@ -38186,7 +38189,11 @@ window.DashboardApp = (() => {
             }
         });
 
-        const list = [...codes.values()].filter(item => item.overdue || item.due);
+        /* Black list (998): يظهر برقمه بس، وخارج النسب */
+        const isBlacklist = item => item.code === "998" || /black\s*list|blacklist|القائمة السوداء/i.test(item.name);
+        const all = [...codes.values()].filter(item => item.overdue || item.due);
+        const blacklist = all.filter(isBlacklist);
+        const list = all.filter(item => !isBlacklist(item));
         const totalOverdue = list.reduce((sum, item) => sum + item.overdue, 0);
         const totalDue = list.reduce((sum, item) => sum + item.due, 0);
         const total = totalOverdue + totalDue;
@@ -38198,7 +38205,7 @@ window.DashboardApp = (() => {
                 ? (b.overdue + b.due) - (a.overdue + a.due)
                 : b.overdue - a.overdue || b.due - a.due);
 
-        if (!list.length) {
+        if (!list.length && !blacklist.length) {
             box.innerHTML = `<p class="dbc-empty">${esc(utils.t("common.noData", "لا توجد بيانات متاحة"))}</p>`;
             return;
         }
@@ -38208,9 +38215,20 @@ window.DashboardApp = (() => {
 
         const meter = (value, max, share, kind) => `
             <div class="dbc-meter ${kind}">
-                <div class="dbc-track"><i style="width:${Math.max(value / max * 100, value > 0 ? 1.5 : 0).toFixed(1)}%"></i></div>
-                <div class="dbc-values"><strong>${n0(value)}</strong><span>${pct(share)}</span></div>
+                <div class="dbc-track"><i style="width:${Math.min(Math.max(value / max * 100, value > 0 ? 1.5 : 0), 100).toFixed(1)}%"></i></div>
+                <div class="dbc-values"><strong>${n0(value)}</strong><span>${share == null ? "—" : pct(share)}</span></div>
             </div>`;
+
+        const blacklistRows = blacklist.map(item => `
+                <div class="dbc-row dbc-blacklist">
+                    <div class="dbc-who">
+                        <strong><bdi dir="ltr">${esc(item.code)}</bdi> ${item.name ? `• ${esc(item.name)}` : ""}</strong>
+                        <small>${esc(T("خارج النسب", "Excluded from shares"))}${item.overdue ? ` • ${esc(T(`${item.overdueCustomers.size} عميل • أقصى ${n0(item.maxDays)} يوم`, `${item.overdueCustomers.size} customers • max ${n0(item.maxDays)} days`))}` : ""}</small>
+                    </div>
+                    ${meter(item.overdue, maxOverdue, null, "is-overdue")}
+                    ${meter(item.due, maxDue, null, "is-due")}
+                    <div class="dbc-total"><strong>${n0(item.overdue + item.due)}</strong><span>—</span></div>
+                </div>`).join("");
 
         box.innerHTML = `
             <div class="dbc-row dbc-head">
@@ -38238,11 +38256,12 @@ window.DashboardApp = (() => {
                 </div>`;
             }).join("")}
             <div class="dbc-row dbc-foot">
-                <strong>${esc(utils.t("common.total", "الإجمالي"))} (${n0(list.length)} ${esc(T("كود", "codes"))})</strong>
+                <strong>${esc(utils.t("common.total", "الإجمالي"))} (${n0(list.length)} ${esc(T("كود", "codes"))})${blacklist.length ? `<small class="dbc-note">${esc(T("بدون Black list", "Excluding Black list"))}</small>` : ""}</strong>
                 <div class="dbc-values"><strong>${n0(totalOverdue)}</strong><span>100%</span></div>
                 <div class="dbc-values"><strong>${n0(totalDue)}</strong><span>100%</span></div>
                 <div class="dbc-total"><strong>${n0(total)}</strong><span>100%</span><small class="${total && totalOverdue / total >= 0.5 ? "is-bad" : ""}">${esc(T(`${Math.round(total ? totalOverdue / total * 100 : 0)}% منها متأخر`, `${Math.round(total ? totalOverdue / total * 100 : 0)}% overdue`))}</small></div>
-            </div>`;
+            </div>
+            ${blacklistRows}`;
     }
 
     document.addEventListener("change", event => {
