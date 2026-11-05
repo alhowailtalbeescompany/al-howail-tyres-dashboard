@@ -10206,6 +10206,12 @@ window.DashboardAPI = (() => {
             updatedAt:
                 response?.updatedAt || "",
 
+            dataAsOf:
+                response?.dataAsOf || "",
+
+            sheetUpdatedAt:
+                response?.sheetUpdatedAt || "",
+
             user:
                 response?.user || null,
 
@@ -14026,7 +14032,9 @@ window.DashboardDashboard = (() => {
         renderTopOverdue();
         renderCharts(summary);
 
-        if (currentData.updatedAt) {
+        if (typeof window.__renderLastUpdate === "function") {
+            window.__renderLastUpdate();
+        } else if (currentData.updatedAt) {
             utils.setText(
                 "lastUpdateText",
                 utils.formatDateTime(
@@ -38997,7 +39005,13 @@ window.DashboardApp = (() => {
 
                 updatedAt:
                     response.updatedAt ||
-                    ""
+                    "",
+
+                dataAsOf:
+                    response.dataAsOf || "",
+
+                sheetUpdatedAt:
+                    response.sheetUpdatedAt || ""
             };
 
             /* لو مفيش شيت Cash collections، كروت الكاش تختفي */
@@ -39026,25 +39040,61 @@ window.DashboardApp = (() => {
        آخر تحديث
     ===================================================== */
 
+    /* آخر تحديث: تاريخ آخر بيانات فعلية + وقت تحديث الشيت */
+    function lastUpdateParts(value) {
+        const en = utils.getLanguage() === "en";
+        const pad = n => String(n).padStart(2, "0");
+        const parse = text => {
+            const match = String(text || "").match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+            return match ? { y: match[1], m: match[2], d: match[3], hh: match[4], mm: match[5] } : null;
+        };
+        const timeText = p => {
+            if (!p || p.hh == null) return "";
+            let hour = Number(p.hh);
+            const suffix = en ? (hour >= 12 ? "PM" : "AM") : (hour >= 12 ? "م" : "ص");
+            hour = hour % 12 || 12;
+            return `${pad(hour)}:${p.mm} ${suffix}`;
+        };
+
+        const raw = state.rawData || {};
+        const dataDay = parse(raw.dataAsOf);
+        const updated = parse(raw.sheetUpdatedAt) || parse(raw.updatedAt || value);
+
+        if (!dataDay && !updated) {
+            const fallback = value ? utils.formatDateTime(value) : utils.formatDateTime(new Date());
+            return { text: fallback, title: fallback };
+        }
+
+        const dateText = dataDay
+            ? `${dataDay.d}/${dataDay.m}/${dataDay.y}`
+            : `${updated.d}/${updated.m}/${updated.y}`;
+        const sameDay = dataDay && updated && dataDay.y === updated.y && dataDay.m === updated.m && dataDay.d === updated.d;
+        const updateText = updated
+            ? (sameDay || !dataDay ? timeText(updated) : `${updated.d}/${updated.m} ${timeText(updated)}`)
+            : "";
+
+        return {
+            text: updateText ? `${dateText} • ${updateText}` : dateText,
+            title: en
+                ? `Data up to ${dateText}${updated ? ` • Sheet updated ${updated.d}/${updated.m}/${updated.y} ${timeText(updated)}` : ""}`
+                : `البيانات حتى ${dateText}${updated ? ` • آخر تحديث للشيت ${updated.d}/${updated.m}/${updated.y} ${timeText(updated)}` : ""}`
+        };
+    }
+
     function updateLastUpdate(value) {
-        const formatted =
-            value
-                ? utils.formatDateTime(
-                      value
-                  )
-                : utils.formatDateTime(
-                      new Date()
-                  );
+        const parts = lastUpdateParts(value);
 
         [
             "lastUpdateText",
             "lastUpdated",
             "updatedAt"
         ].forEach(id => {
-            utils.setText(
-                id,
-                formatted
-            );
+            const element = utils.byId(id);
+            if (element) {
+                element.textContent = parts.text;
+                element.title = parts.title;
+                element.setAttribute("dir", "ltr");
+            }
         });
 
         utils
@@ -39053,9 +39103,11 @@ window.DashboardApp = (() => {
             )
             .forEach(element => {
                 element.textContent =
-                    formatted;
+                    parts.text;
             });
     }
+
+    window.__renderLastUpdate = () => updateLastUpdate(state.rawData?.updatedAt);
 
 
     /* =====================================================
