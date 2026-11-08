@@ -1931,6 +1931,7 @@ tbody tr:last-child td {
     margin-bottom: 8px;
 }
 
+.wk-lfl { display:block; font-size:10px; opacity:.7; font-weight:500; }
 .comparison-growth {
     display: inline-block;
     padding: 3px 9px;
@@ -7191,7 +7192,7 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                                             0.00 ر.س
                                         </strong>
                                         <span class="comparison-card-previous">
-                                            <span data-i18n="salesmanProfiles.previousMonth">الشهر السابق</span>:
+                                            <span class="js-prev-period-label">الشهر السابق</span>:
                                             <span id="profileSalesPreviousValue">0.00 ر.س</span>
                                         </span>
                                         <span class="comparison-growth comparison-growth-flat" id="profileSalesGrowthBadge">0%</span>
@@ -7205,7 +7206,7 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                                             0.00 ر.س
                                         </strong>
                                         <span class="comparison-card-previous">
-                                            <span data-i18n="salesmanProfiles.previousMonth">الشهر السابق</span>:
+                                            <span class="js-prev-period-label">الشهر السابق</span>:
                                             <span id="profileCollectionsPreviousValue">0.00 ر.س</span>
                                         </span>
                                         <span class="comparison-growth comparison-growth-flat" id="profileCollectionsGrowthBadge">0%</span>
@@ -7219,7 +7220,7 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                                             0.00 ر.س
                                         </strong>
                                         <span class="comparison-card-previous">
-                                            <span data-i18n="salesmanProfiles.previousMonth">الشهر السابق</span>:
+                                            <span class="js-prev-period-label">الشهر السابق</span>:
                                             <span id="profileCashPreviousValue">0.00 ر.س</span>
                                         </span>
                                         <span class="comparison-growth comparison-growth-flat" id="profileCashGrowthBadge">0%</span>
@@ -7233,7 +7234,7 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                                             0
                                         </strong>
                                         <span class="comparison-card-previous">
-                                            <span data-i18n="salesmanProfiles.previousMonth">الشهر السابق</span>:
+                                            <span class="js-prev-period-label">الشهر السابق</span>:
                                             <span id="profileInvoiceCountPreviousValue">0</span>
                                         </span>
                                         <span class="comparison-growth comparison-growth-flat" id="profileInvoiceCountGrowthBadge">0%</span>
@@ -19924,6 +19925,7 @@ window.DashboardProfiles = (() => {
      * السنوي بشكل مستقل عن فلتر الفترة الحالي.
      */
     let rawInvoiceRows = [];
+    let dataAsOfValue = "";
     let rawCollectionRows = [];
 
     /*
@@ -20385,6 +20387,7 @@ window.DashboardProfiles = (() => {
     }
 
     function setRawData(data = {}) {
+        dataAsOfValue = data.dataAsOf || window.__dataAsOf || "";
         rawInvoiceRows = Array.isArray(data.invoices)
             ? data.invoices
             : [];
@@ -20683,22 +20686,92 @@ window.DashboardProfiles = (() => {
         return ((current - previous) / previous) * 100;
     }
 
+    /*
+     * آخر يوم فيه بيانات فعلية (على مستوى الشركة من السيرفر)،
+     * ولو مش موجود ناخد آخر تاريخ فاتورة في البيانات المحملة.
+     */
+    function getDataAsOfDate() {
+        const text = String(dataAsOfValue || window.__dataAsOf || "").slice(0, 10);
+        const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+
+        let latest = null;
+        rawInvoiceRows.forEach(row => {
+            const date = utils.parseDate(getInvoiceDate(row));
+            if (date && !isNaN(date.getTime()) && (!latest || date > latest)) latest = date;
+        });
+        if (!latest) return null;
+        return new Date(latest.getFullYear(), latest.getMonth(), latest.getDate());
+    }
+
+    /*
+     * مقارنة عادلة: لو الشهر لسه مخلصش، بنقارن نفس عدد الأيام
+     * من الشهر اللي قبله (مثلاً 1–6 نوفمبر مقابل 1–6 أكتوبر).
+     */
+    function comparablePeriod(referenceDate) {
+        const year = referenceDate.getFullYear();
+        const month = referenceDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const previousDate = new Date(year, month - 1, 1);
+        const daysInPrevious = new Date(previousDate.getFullYear(), previousDate.getMonth() + 1, 0).getDate();
+        const asOf = getDataAsOfDate();
+
+        let cutDay = null;
+        if (asOf) {
+            const asOfKey = asOf.getFullYear() * 12 + asOf.getMonth();
+            const refKey = year * 12 + month;
+            if (asOfKey === refKey && asOf.getDate() < daysInMonth) cutDay = asOf.getDate();
+            else if (asOfKey < refKey) cutDay = 0;
+        }
+
+        const partial = cutDay != null;
+        const previousDays = partial ? Math.min(cutDay, daysInPrevious) : daysInPrevious;
+
+        return {
+            partial,
+            day: partial ? cutDay : daysInMonth,
+            previousDays,
+            daysInPrevious,
+            year,
+            month,
+            previousYear: previousDate.getFullYear(),
+            previousMonth: previousDate.getMonth(),
+            current: {
+                start: new Date(year, month, 1),
+                end: partial ? new Date(year, month, cutDay + 1) : new Date(year, month + 1, 1)
+            },
+            previous: {
+                start: new Date(previousDate.getFullYear(), previousDate.getMonth(), 1),
+                end: partial
+                    ? new Date(previousDate.getFullYear(), previousDate.getMonth(), previousDays + 1)
+                    : new Date(previousDate.getFullYear(), previousDate.getMonth() + 1, 1)
+            }
+        };
+    }
+
+    /* نص المقارنة: "نفس الفترة من أكتوبر (1–6)" أو "أكتوبر (الشهر كامل)" */
+    function comparisonLabel(monthly, english) {
+        const period = monthly && monthly.period;
+        if (!period) return english ? "Previous month" : "الشهر السابق";
+        const monthName = new Intl.DateTimeFormat(english ? "en-US" : "ar-EG-u-ca-gregory-nu-latn", { month: "long" })
+            .format(new Date(period.previousYear, period.previousMonth, 1));
+        if (!period.partial) {
+            return english ? `${monthName} (full month)` : `${monthName} (الشهر كامل)`;
+        }
+        if (period.previousDays <= 0) {
+            return english ? `Same period of ${monthName}` : `نفس الفترة من ${monthName}`;
+        }
+        const range = period.previousDays === 1 ? "1" : `1–${period.previousDays}`;
+        return english
+            ? `Same period of ${monthName} (${range})`
+            : `نفس الفترة من ${monthName} (${range})`;
+    }
+
     function buildMonthlyComparison(profileCodes, referenceDate) {
-        const currentBounds = getMonthBounds(
-            referenceDate.getFullYear(),
-            referenceDate.getMonth()
-        );
-
-        const previousDate = new Date(
-            referenceDate.getFullYear(),
-            referenceDate.getMonth() - 1,
-            1
-        );
-
-        const previousBounds = getMonthBounds(
-            previousDate.getFullYear(),
-            previousDate.getMonth()
-        );
+        const period = comparablePeriod(referenceDate);
+        const currentBounds = period.current;
+        const previousBounds = period.previous;
+        const previousDate = new Date(period.previousYear, period.previousMonth, 1);
 
         const codeInvoices = rawInvoiceRows.filter(row =>
             rowBelongsToCodes(row, profileCodes)
@@ -20727,7 +20800,7 @@ window.DashboardProfiles = (() => {
         const currentSales = utils.sumBy(currentInvoices, getInvoiceSales);
         const previousSales = utils.sumBy(previousInvoices, getInvoiceSales);
 
-        // التحصيل الكاش (شهري)
+        // التحصيل الكاش شهري فقط: لو الشهر لسه مخلصش ناخد نسبة الأيام من الشهر السابق
         const pad2 = value => String(value).padStart(2, "0");
         const currentMonthKey = `${referenceDate.getFullYear()}-${pad2(referenceDate.getMonth() + 1)}`;
         const previousMonthKey = `${previousDate.getFullYear()}-${pad2(previousDate.getMonth() + 1)}`;
@@ -20738,7 +20811,10 @@ window.DashboardProfiles = (() => {
             row => utils.toNumber(row.cashAmount)
         );
         const currentCash = cashFor(currentMonthKey);
-        const previousCash = cashFor(previousMonthKey);
+        const previousCashFull = cashFor(previousMonthKey);
+        const previousCash = period.partial
+            ? previousCashFull * (period.previousDays / period.daysInPrevious)
+            : previousCashFull;
 
         const currentCollectionsTotal = utils.sumBy(
             currentCollections,
@@ -20750,7 +20826,11 @@ window.DashboardProfiles = (() => {
             getCollectionAmount
         );
 
+        const currentInvoiceCount = uniqueInvoiceCount(currentInvoices);
+        const previousInvoiceCount = uniqueInvoiceCount(previousInvoices);
+
         return {
+            period,
             sales: {
                 current: currentSales,
                 previous: previousSales,
@@ -20767,14 +20847,15 @@ window.DashboardProfiles = (() => {
             cash: {
                 current: currentCash,
                 previous: previousCash,
+                estimated: period.partial,
                 growth: calculateGrowth(currentCash, previousCash)
             },
             invoiceCount: {
-                current: uniqueInvoiceCount(currentInvoices),
-                previous: uniqueInvoiceCount(previousInvoices),
+                current: currentInvoiceCount,
+                previous: previousInvoiceCount,
                 growth: calculateGrowth(
-                    uniqueInvoiceCount(currentInvoices),
-                    uniqueInvoiceCount(previousInvoices)
+                    currentInvoiceCount,
+                    previousInvoiceCount
                 )
             }
         };
@@ -22350,16 +22431,43 @@ window.DashboardProfiles = (() => {
         const allInvoices = new Set();
         const allCustomers = new Set();
 
+        const asOfDay = getDataAsOfDate();
+        const salesBetween = (from, toExclusive) => utils.sumBy(
+            invoiceRows.filter(row => {
+                if (!rowBelongsToCodes(row, codes)) return false;
+                const date = utils.parseDate(getInvoiceDate(row));
+                return date && !isNaN(date.getTime()) && date >= from && date < toExclusive;
+            }),
+            getInvoiceSales
+        );
+
         list.forEach((week, index) => {
             const previous = index > 0 ? list[index - 1] : null;
             week.share = totalSales ? (week.sales / totalSales) * 100 : null;
-            week.change = previous && previous.sales
-                ? ((week.sales - previous.sales) / Math.abs(previous.sales)) * 100
-                : null;
             // الأسبوع الحالي (لسه مخلصش)
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             week.partial = week.start <= today && today <= week.end;
+
+            let previousSales = previous ? previous.sales : 0;
+            week.comparedDays = 7;
+            // آخر يوم فيه بيانات فعلية (أو النهارده لو أقدم)
+            const lastDay = asOfDay && asOfDay < today ? asOfDay : today;
+            const weekEndDay = new Date(week.end);
+            weekEndDay.setHours(0, 0, 0, 0);
+            if (previous && week.start <= lastDay && lastDay < weekEndDay) {
+                // نقارن نفس عدد الأيام من الأسبوع اللي قبله
+                const days = Math.max(0, Math.min(7, Math.round((lastDay - week.start) / 86400000) + 1));
+                week.comparedDays = days;
+                const from = new Date(previous.start);
+                const to = new Date(previous.start);
+                to.setDate(to.getDate() + days);
+                previousSales = days > 0 ? salesBetween(from, to) : 0;
+                week.previousComparable = previousSales;
+            }
+            week.change = previous && previousSales
+                ? ((week.sales - previousSales) / Math.abs(previousSales)) * 100
+                : null;
         });
 
         invoiceRows
@@ -22427,7 +22535,7 @@ window.DashboardProfiles = (() => {
                         <td>${utils.formatNumber(week.invoices, 0)}</td>
                         <td>${utils.formatNumber(week.customers, 0)}</td>
                         <td>${week.share == null ? "—" : week.share.toFixed(1) + "%"}</td>
-                        <td dir="ltr" class="${changeClass}">${formatWeekChange(week.change)}</td>
+                        <td dir="ltr" class="${changeClass}"${week.comparedDays < 7 ? ` title="${utils.escapeHTML(isArabic ? `مقارنة بأول ${week.comparedDays} أيام من الأسبوع السابق` : `vs first ${week.comparedDays} days of previous week`)}"` : ""}>${formatWeekChange(week.change)}${week.comparedDays < 7 && week.change != null ? `<small class="wk-lfl">${utils.escapeHTML(isArabic ? `نفس ${week.comparedDays} أيام` : `same ${week.comparedDays} days`)}</small>` : ""}</td>
                     </tr>
                 `;
             }).join("") +
@@ -22568,7 +22676,7 @@ window.DashboardProfiles = (() => {
                 </div>
                 <div class="ps-kpis ${hasCash ? "" : "is-three"}">
                     ${kpi(T("تحصيل الكرديت", "Credit collections"), n0(credit),
-                        growth == null || !isFinite(growth) || !(utils.toNumber(profile.monthly?.collections?.previous) > 0) ? "" : `<em class="${growth >= 0 ? "ps-up" : "ps-down"}">${growth >= 0 ? "+" : ""}${Math.round(growth)}% ${esc(T("عن الشهر السابق", "vs previous month"))}</em>`)}
+                        growth == null || !isFinite(growth) || !(utils.toNumber(profile.monthly?.collections?.previous) > 0) ? "" : `<em class="${growth >= 0 ? "ps-up" : "ps-down"}">${growth >= 0 ? "+" : ""}${Math.round(growth)}% ${esc(profile.monthly?.period?.partial ? T("عن نفس الفترة من الشهر السابق", "vs same period last month") : T("عن الشهر السابق", "vs previous month"))}</em>`)}
                     ${hasCash ? kpi(T("التحصيل الكاش", "Cash collections"), n0(cash), esc(T(`إجمالي التحصيل ${n0(credit + cash)}`, `Total collected ${n0(credit + cash)}`))) : ""}
                     ${kpi(T("المستحق (لم يتأخر)", "Due (not overdue)"), n0(due), esc(T(`من إجمالي مديونية ${n0(receivables)}`, `of ${n0(receivables)} receivables`)))}
                     ${kpi(T("المتأخرات", "Overdue"), n0(overdue), overdueShare == null ? "" : esc(T(`${Math.round(overdueShare)}% من المديونية متأخرة`, `${Math.round(overdueShare)}% of receivables`)), overdue > 0 ? "is-bad" : "")}
@@ -22762,6 +22870,16 @@ window.DashboardProfiles = (() => {
 
     function renderMonthlyComparison(monthly) {
         if (!monthly) return;
+
+        const english = utils.getLanguage() === "en";
+        const prevLabel = comparisonLabel(monthly, english);
+        document.querySelectorAll(".js-prev-period-label").forEach(element => {
+            element.textContent = prevLabel;
+        });
+        const cashLabel = utils.byId("profileCashPreviousValue")?.closest(".comparison-card")?.querySelector(".js-prev-period-label");
+        if (cashLabel && monthly.cash && monthly.cash.estimated) {
+            cashLabel.textContent = `${prevLabel} ${english ? "(est. by days)" : "(تقديري بالأيام)"}`;
+        }
 
         utils.setText(
             "profileSalesCurrentValue",
@@ -23427,23 +23545,23 @@ window.DashboardProfiles = (() => {
                     <div class="comparison-box">
                         <span>${L("Sales", "المبيعات")}</span>
                         <strong>${utils.formatCurrency(monthly.sales.current)}</strong>
-                        <small>${L("Previous month", "الشهر السابق")}: ${utils.formatCurrency(monthly.sales.previous)} (${formatGrowth(monthly.sales.growth)})</small>
+                        <small>${utils.escapeHTML(L(comparisonLabel(monthly, true), comparisonLabel(monthly, false)))}: ${utils.formatCurrency(monthly.sales.previous)} (${formatGrowth(monthly.sales.growth)})</small>
                     </div>
                     <div class="comparison-box">
                         <span>${L("Credit Collections", "تحصيل الكرديت")}</span>
                         <strong>${utils.formatCurrency(monthly.collections.current)}</strong>
-                        <small>${L("Previous month", "الشهر السابق")}: ${utils.formatCurrency(monthly.collections.previous)} (${formatGrowth(monthly.collections.growth)})</small>
+                        <small>${utils.escapeHTML(L(comparisonLabel(monthly, true), comparisonLabel(monthly, false)))}: ${utils.formatCurrency(monthly.collections.previous)} (${formatGrowth(monthly.collections.growth)})</small>
                     </div>
                     ${monthly.cash && !document.body.classList.contains("cash-disabled") ? `
                     <div class="comparison-box">
                         <span>${L("Cash Collections", "التحصيل الكاش")}</span>
                         <strong>${utils.formatCurrency(monthly.cash.current)}</strong>
-                        <small>${L("Previous month", "الشهر السابق")}: ${utils.formatCurrency(monthly.cash.previous)} (${formatGrowth(monthly.cash.growth)})</small>
+                        <small>${utils.escapeHTML(L(comparisonLabel(monthly, true) + (monthly.cash && monthly.cash.estimated ? " (est. by days)" : ""), comparisonLabel(monthly, false) + (monthly.cash && monthly.cash.estimated ? " (تقديري بالأيام)" : "")))}: ${utils.formatCurrency(monthly.cash.previous)} (${formatGrowth(monthly.cash.growth)})</small>
                     </div>` : ""}
                     <div class="comparison-box">
                         <span>${L("Invoice Count", "عدد الفواتير")}</span>
                         <strong>${utils.formatNumber(monthly.invoiceCount.current, 0)}</strong>
-                        <small>${L("Previous month", "الشهر السابق")}: ${utils.formatNumber(monthly.invoiceCount.previous, 0)} (${formatGrowth(monthly.invoiceCount.growth)})</small>
+                        <small>${utils.escapeHTML(L(comparisonLabel(monthly, true), comparisonLabel(monthly, false)))}: ${utils.formatNumber(monthly.invoiceCount.previous, 0)} (${formatGrowth(monthly.invoiceCount.growth)})</small>
                     </div>
                 </div>
 
@@ -23485,7 +23603,7 @@ window.DashboardProfiles = (() => {
                                                 <td>${utils.formatNumber(week.invoices, 0)}</td>
                                                 <td>${utils.formatNumber(week.customers, 0)}</td>
                                                 <td>${week.share == null ? "—" : week.share.toFixed(1) + "%"}</td>
-                                                <td>${formatWeekChange(week.change)}</td>
+                                                <td>${formatWeekChange(week.change)}${week.comparedDays < 7 && week.change != null ? `<br><small style="color:#64748b">${L(`same ${week.comparedDays} days`, `نفس ${week.comparedDays} أيام`)}</small>` : ""}</td>
                                             </tr>
                                         `).join("")}
                                         <tr>
