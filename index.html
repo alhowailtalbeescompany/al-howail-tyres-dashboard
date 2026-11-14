@@ -7671,6 +7671,18 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                             <button
                                 class="report-card"
                                 type="button"
+                                data-report="history"
+                            >
+                                <i class="fa-solid fa-chart-line"></i>
+
+                                <span data-i18n="reports.historyReport">
+                                    تقرير المقارنات التاريخية (مجمع / فرع)
+                                </span>
+                            </button>
+
+                            <button
+                                class="report-card"
+                                type="button"
                                 data-report="target"
                             >
                                 <i class="fa-solid fa-bullseye"></i>
@@ -8560,6 +8572,7 @@ const TRANSLATIONS = {
             collectionsReport: "تقرير تحصيل الكرديت",
             cashReport: "تقرير التحصيل الكاش",
             receivablesReport: "تقرير المستحقات والمتأخرات (مجمع)",
+            historyReport: "تقرير المقارنات التاريخية (مجمع / فرع)",
             overdueReport: "تقرير المتأخرات",
             targetReport: "تقرير تحقيق الأهداف",
             salesmanReport: "تقرير المندوب",
@@ -9006,6 +9019,7 @@ const TRANSLATIONS = {
             collectionsReport: "Credit Collections Report",
             cashReport: "Cash Collections Report",
             receivablesReport: "Due & Overdue Report (Consolidated)",
+            historyReport: "Historical Comparison Report (Consolidated / Branch)",
             overdueReport: "Overdue Report",
             targetReport: "Target Achievement Report",
             salesmanReport: "Salesman Report",
@@ -30388,6 +30402,12 @@ window.DashboardReports = (() => {
             return true;
         }
 
+        /* تقرير المقارنات التاريخية: مجمع / فرع / الكل */
+        if (type === "history" && window.DashboardHistory) {
+            window.DashboardHistory.openReport();
+            return true;
+        }
+
         /* تقرير المستحقات والمتأخرات المجمع */
         if (type === "receivables" && window.DashboardReceivablesReport) {
             window.DashboardReceivablesReport.open();
@@ -37810,8 +37830,10 @@ window.DashboardHistory = (() => {
     };
     const pct = value => (value == null || !isFinite(value) ? "—" : `${n1(value)}%`);
     // \u2066…\u2069 بيثبت اتجاه الرقم والإشارة جوه النص العربي
-    const signed = value => (value == null || !isFinite(value) ? "—" : `\u2066${value > 0 ? "+" : ""}${n1(value)}%\u2069`);
-    const pp = value => (value == null || !isFinite(value) ? "—" : `\u2066${value > 0 ? "+" : ""}${n1(value)}\u2069 ${lang() === "ar" ? "نقطة" : "pp"}`);
+    const signed = value => (value == null || !isFinite(value) ? "—" : `\u200E${value > 0 ? "+" : ""}${n1(value)}%\u200E`);
+    const pp = value => (value == null || !isFinite(value) ? "—" : `\u200E${value > 0 ? "+" : ""}${n1(value)}\u200E ${lang() === "ar" ? "نقطة" : "pp"}`);
+    // أي رقم بإشارة (+/-) بيتلف في عنصر معزول عشان يتعرض صح جوه النص العربي
+    const fixBidi = html => String(html).replace(/\u200E([^\u200E<>]*)\u200E/g, '<bdi dir="ltr">$1</bdi>');
     const growth = (current, previous) => (previous > 0 ? ((current - previous) / previous) * 100 : null);
     const cls = value => (value == null || !isFinite(value) ? "" : value > 0.05 ? "hx-up" : value < -0.05 ? "hx-down" : "");
     const dateText = iso => {
@@ -38418,7 +38440,7 @@ window.DashboardHistory = (() => {
         const section = (title, list) => (list.length ? `<tr class="hx-sep"><td colspan="${ys.length + 8}">${esc(title)}</td></tr>${list.map(rowHTML).join("")}` : "");
         return `
             <article class="content-card hx-block">
-                <div class="hx-head"><h3>${esc(t.ranking(scope.type))}</h3><small class="hx-muted">${esc(lang() === "ar" ? "اضغط على أي صف لفتح تحليله • اضغط على العنوان للترتيب" : "Click a row to open it • click a header to sort")}</small></div>
+                <div class="hx-head"><h3>${esc(t.ranking(scope.type))}</h3><small class="hx-muted hx-hint">${esc(lang() === "ar" ? "اضغط على أي صف لفتح تحليله • اضغط على العنوان للترتيب" : "Click a row to open it • click a header to sort")}</small></div>
                 <div class="table-wrapper"><table class="hx-table hx-rank">
                     <thead><tr>
                         <th>${esc(t.code)}</th><th>${esc(t.name)}</th>
@@ -38623,21 +38645,305 @@ window.DashboardHistory = (() => {
 
         add("Insights", scopes().map(s => {
             const { items, actions } = buildInsights(s);
-            const clean = text => String(text).replace(/[\u2066-\u2069]/g, "");
+            const clean = text => String(text).replace(/[\u2066-\u2069\u200E]/g, "");
             return { Scope: scopeLabel(s), Insights: items.map(i => `• ${clean(i.text)}`).join("\n"), Actions: actions.map(clean).join("\n") };
         }));
 
         window.XLSX.writeFile(book, `Sales_History_Comparison_${meta().asOf || ""}.xlsx`);
     }
 
-    function printPage() {
-        document.body.classList.add("hx-printing");
-        const done = () => {
-            document.body.classList.remove("hx-printing");
-            window.removeEventListener("afterprint", done);
+    /*
+     * طباعة: مستند منفصل بخلفية بيضاء (حتى لو الوضع الليلي شغال)،
+     * الرسومات بتتحول لصور، والجداول الطويلة بتتقسم على الصفحات مع تكرار العناوين.
+     */
+    const PRINT_CSS = `
+        @page { size: A4 landscape; margin: 10mm 9mm; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        html, body { background: #ffffff; color: #0f172a; margin: 0; }
+        body { font-family: var(--pf), "Segoe UI", Tahoma, Arial, sans-serif; font-size: 10.5px; line-height: 1.45; }
+        .pr-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2px solid #176b87; padding-bottom: 8px; margin-bottom: 12px; }
+        .pr-header h1 { margin: 0; font-size: 18px; color: #0f3d4f; }
+        .pr-header .pr-scope { font-size: 13px; font-weight: 700; color: #176b87; margin-top: 3px; }
+        .pr-header .pr-meta { text-align: end; color: #475569; font-size: 10px; line-height: 1.6; }
+        .hx-root { display: block; }
+        .content-card, .hx-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin: 0 0 10px; box-shadow: none; }
+        .hx-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; break-after: avoid; page-break-after: avoid; }
+        .hx-head h3 { margin: 0; font-size: 13px; color: #0f3d4f; }
+        .hx-hint { display: none !important; }
+        .hx-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; break-inside: avoid; }
+        .hx-card { margin: 0; padding: 8px 10px; display: grid; gap: 2px; }
+        .hx-card span { color: #64748b; font-size: 10px; }
+        .hx-card strong { font-size: 17px; }
+        .hx-card small { font-size: 9.5px; color: #64748b; }
+        .hx-up { color: #15803d !important; }
+        .hx-down { color: #b91c1c !important; }
+        .hx-muted { color: #94a3b8; }
+        table.hx-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+        .hx-table thead { display: table-header-group; }
+        .hx-table tr { break-inside: avoid; page-break-inside: avoid; }
+        .hx-table th, .hx-table td { padding: 3px 5px; border-bottom: 1px solid #e2e8f0; text-align: start; white-space: nowrap; vertical-align: middle; }
+        .hx-table th { background: #f1f5f9; color: #334155; font-weight: 700; }
+        .hx-table td.n, .hx-table th.n { text-align: end; font-variant-numeric: tabular-nums; }
+        .hx-table th.hx-yh { text-align: center; }
+        .hx-table td.hx-cur { font-weight: 700; background: #eef6f9; }
+        .hx-table td.hx-wrap { white-space: normal; }
+        .hx-table tr.hx-total td { font-weight: 700; border-top: 2px solid #94a3b8; }
+        .hx-table tr.hx-sep td { background: #e6f1f5; color: #0f3d4f; font-weight: 700; }
+        .hx-rank tr.hx-branch-row td { font-weight: 700; }
+        .hx-badge { display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 9px; background: #f1f5f9; color: #475569; }
+        .hx-badge.up { background: #dcfce7; color: #15803d; }
+        .hx-badge.down { background: #fee2e2; color: #b91c1c; }
+        .hx-item { font-size: 9px; }
+        .hx-grid-2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 10px; align-items: start; }
+        .hx-grid-eq { grid-template-columns: 1fr 1fr; }
+        .hx-grid-2 > .hx-block { margin: 0; }
+        .pr-pair { margin-bottom: 10px; }
+        .hx-chart, .hx-chart-sm { height: auto; break-inside: avoid; }
+        .hx-chart img, .hx-chart-sm img { width: 100%; height: auto; display: block; }
+        .hx-chart img { max-height: 70mm; object-fit: contain; }
+        .hx-insights ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
+        .hx-insights li { display: flex; gap: 6px; padding: 4px 8px; border-radius: 4px; background: #f8fafc; break-inside: avoid; border-inline-start: 3px solid #cbd5e1; }
+        .hx-insights li.hx-good { border-inline-start-color: #16a34a; }
+        .hx-insights li.hx-bad { border-inline-start-color: #dc2626; }
+        .hx-insights li.hx-info { border-inline-start-color: #2563eb; }
+        .hx-insights li i { display: none; }
+        .hx-insights h4 { margin: 8px 0 4px; font-size: 11px; color: #0f3d4f; }
+        .hx-insights ol { margin: 0; padding-inline-start: 18px; display: grid; gap: 2px; }
+        .hx-pv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .hx-pv div { display: grid; gap: 2px; padding: 6px 8px; border-radius: 4px; background: #f8fafc; }
+        .hx-pv span, .hx-pv small { font-size: 9.5px; color: #64748b; }
+        .hx-pv strong { font-size: 14px; }
+        .hx-note { font-size: 9px; color: #64748b; margin: 4px 0 0; }
+        .pr-section { break-before: page; page-break-before: always; }
+        .pr-report + .pr-report { break-before: page; page-break-before: always; }
+        .hx-chart svg, .hx-chart-sm svg { width: 100%; height: auto; display: block; }
+        .hx-chart svg { max-height: 72mm; }
+        @media screen {
+            body { background: #e2e8f0; padding: 16px; }
+            .pr-report { background: #fff; max-width: 1100px; margin: 0 auto 16px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+            .pr-section { margin-top: 14px; }
+        }
+    `;
+
+    /* رسومات SVG للتقرير (مش محتاجة Chart.js وبتطبع واضحة) */
+    function svgYears(scope) {
+        const ys = years();
+        const cy = currentYear();
+        const vals = ys.map(y => metricsOf(scope, y)?.net || 0);
+        const max = Math.max(1, ...vals);
+        const W = 360, H = 190, base = 160, top0 = 22, bw = Math.min(56, (W - 40) / ys.length - 18);
+        const step = (W - 40) / ys.length;
+        return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-size="10" direction="ltr">
+            <line x1="20" x2="${W - 20}" y1="${base}" y2="${base}" stroke="#94a3b8"/>
+            ${ys.map((y, i) => {
+                const h = (vals[i] / max) * (base - top0);
+                const x = 20 + i * step + (step - bw) / 2;
+                return `<rect x="${x}" y="${base - h}" width="${bw}" height="${h}" rx="2" fill="${y === cy ? "#176b87" : "#b6ccd6"}"/>
+                    <text x="${x + bw / 2}" y="${base - h - 5}" text-anchor="middle" fill="#0f172a" font-weight="${y === cy ? 700 : 400}">${short(vals[i])}</text>
+                    <text x="${x + bw / 2}" y="${base + 14}" text-anchor="middle" fill="#475569">${y}</text>`;
+            }).join("")}
+        </svg>`;
+    }
+
+    function svgMonthly(scope) {
+        const ys = years();
+        const cy = currentYear();
+        const lastMonth = meta().asOfMonth;
+        const t = T();
+        const series = ys.map(y => (scope.months[y] || []).map((mm, i) => (y === cy && i > lastMonth - 1 ? null : mm.net || 0)));
+        const max = Math.max(1, ...series.flat().filter(v => v != null));
+        const W = 760, H = 230, left = 46, right = 16, y0 = 14, base = 196;
+        const x = i => left + (i * (W - left - right)) / 11;
+        const y = v => base - (v / max) * (base - y0);
+        const colors = ["#cbd5e1", "#94a3b8", "#f59e0b", "#176b87", "#16a34a"];
+        const color = i => colors[colors.length - ys.length + i] || "#64748b";
+        const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => max * f);
+        return `<svg viewBox="0 0 ${W} ${H + 18}" xmlns="http://www.w3.org/2000/svg" font-size="10" direction="ltr">
+            ${ticks.map(v => `<line x1="${left}" x2="${W - right}" y1="${y(v)}" y2="${y(v)}" stroke="#e2e8f0"/><text x="${left - 6}" y="${y(v) + 3}" text-anchor="end" fill="#94a3b8">${short(v)}</text>`).join("")}
+            ${t.months.map((mn, i) => `<text x="${x(i)}" y="${base + 14}" text-anchor="middle" fill="#475569">${esc(mn)}</text>`).join("")}
+            ${series.map((vals, si) => {
+                const pts = vals.map((v, i) => (v == null ? null : `${x(i)},${y(v)}`)).filter(Boolean).join(" ");
+                const isCur = ys[si] === cy;
+                return `<polyline points="${pts}" fill="none" stroke="${color(si)}" stroke-width="${isCur ? 2.6 : 1.6}"/>${vals.map((v, i) => (v == null ? "" : `<circle cx="${x(i)}" cy="${y(v)}" r="${isCur ? 2.6 : 1.8}" fill="${color(si)}"/>`)).join("")}`;
+            }).join("")}
+            ${ys.map((yr, si) => `<g transform="translate(${left + si * 90}, ${H + 10})"><rect width="14" height="4" y="-4" fill="${color(si)}"/><text x="18" y="0" fill="#334155">${yr}${yr === cy ? " *" : ""}</text></g>`).join("")}
+        </svg>`;
+    }
+
+    function scopeReportHTML(scope) {
+        const t = T();
+        const ar = lang() === "ar";
+        const m = meta();
+        const periodLabel = state.period === "ytd"
+            ? t.ytd(m.asOfDay, m.asOfMonth)
+            : state.period === "mtd" ? t.mtd(m.asOfDay, m.asOfMonth) : t.full;
+        const printedAt = new Intl.DateTimeFormat(ar ? "ar-EG-u-ca-gregory-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
+        const charts = html => html
+            .replace(/<canvas id="historyMonthlyChart"><\/canvas>/g, svgMonthly(scope))
+            .replace(/<canvas id="historyYearChart"><\/canvas>/g, svgYears(scope));
+
+        return fixBidi(`<section class="pr-report">
+            <header class="pr-header">
+                <div>
+                    <h1>${esc(ar ? "تقرير المقارنات التاريخية — مبيعات الإطارات" : "Historical comparison report — Tyre sales")}</h1>
+                    <div class="pr-scope">${esc(scopeLabel(scope))}</div>
+                </div>
+                <div class="pr-meta">
+                    <div>${esc(t.period)}: ${esc(periodLabel)}</div>
+                    <div>${esc(t.dataRange(dateText(m.from), dateText(m.asOf), n0(m.rows)))}</div>
+                    <div>${esc(ar ? "تاريخ الطباعة" : "Printed")}: ${esc(printedAt)}</div>
+                </div>
+            </header>
+            ${charts(cardsHTML(scope))}
+            ${charts(insightsHTML(scope))}
+            <div class="pr-section">${charts(yearTableHTML(scope))}</div>
+            ${charts(rankingHTML(scope))}
+            <div class="pr-section">${charts(monthlyHTML(scope))}</div>
+            <div class="pr-section">${charts(customersHTML(scope))}</div>
+            <div class="pr-section">${charts(productsHTML(scope))}</div>
+        </section>`);
+    }
+
+    function buildReportDocument(ids) {
+        const ar = lang() === "ar";
+        const list = ids.map(findScope).filter(Boolean);
+        const font = (getComputedStyle(document.body).fontFamily || "").replace(/[<>]/g, "");
+        const title = list.length === 1 ? scopeLabel(list[0]) : (ar ? "كل الفروع" : "All branches");
+        return `<!doctype html>
+<html lang="${ar ? "ar" : "en"}" dir="${ar ? "rtl" : "ltr"}">
+<head><meta charset="utf-8"><title>${esc(`${ar ? "المقارنات التاريخية" : "Historical comparisons"} - ${title}`)}</title>
+<style>:root{--pf:${font};}${PRINT_CSS}</style></head>
+<body>${list.map(scopeReportHTML).join("")}</body></html>`;
+    }
+
+    function printHTML(html) {
+        const old = document.getElementById("historyPrintFrame");
+        if (old) old.remove();
+        const frame = document.createElement("iframe");
+        frame.id = "historyPrintFrame";
+        frame.setAttribute("aria-hidden", "true");
+        frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+        document.body.appendChild(frame);
+        const doc = frame.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        const run = () => {
+            try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (error) { window.print(); }
         };
-        window.addEventListener("afterprint", done);
-        setTimeout(() => window.print(), 150);
+        const ready = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
+        ready.then(() => setTimeout(run, 250)).catch(() => setTimeout(run, 250));
+    }
+
+    function printPage() {
+        if (!findScope(state.scopeId)) return;
+        printHTML(buildReportDocument([state.scopeId]));
+    }
+
+    /* ---------- تقرير من صفحة التقارير: المجمع / فرع / كل الفروع ---------- */
+
+    function reportChoices() {
+        const ar = lang() === "ar";
+        const list = scopes();
+        const choices = [];
+        const company = list.find(s => s.type === "company");
+        const branches = list.filter(s => s.type === "branch");
+        if (company) choices.push({ value: "company", label: T().company, ids: ["company"] });
+        branches.forEach(b => choices.push({ value: b.id, label: scopeLabel(b), ids: [b.id] }));
+        if (branches.length > 1) {
+            choices.push({
+                value: "__all",
+                label: ar ? "الكل في ملف واحد (المجمع + كل فرع)" : "All in one file (consolidated + each branch)",
+                ids: (company ? ["company"] : []).concat(branches.map(b => b.id))
+            });
+        }
+        if (!choices.length) {
+            list.filter(s => s.type === "code").forEach(c => choices.push({ value: c.id, label: scopeLabel(c), ids: [c.id] }));
+        }
+        return choices;
+    }
+
+    function closeReport() {
+        utils.byId("historyReportModal")?.remove();
+    }
+
+    async function openReport() {
+        const ar = lang() === "ar";
+        bind();
+        if (!state.data) {
+            utils.showToast?.(T().loading, "info");
+            await load(false);
+        }
+        if (!state.data || state.data.missingSheet || !scopes().length) {
+            utils.showToast?.(state.error || T().empty, "warning");
+            return;
+        }
+        closeReport();
+        const choices = reportChoices();
+        let selected = choices[0];
+
+        const modal = document.createElement("div");
+        modal.id = "historyReportModal";
+        modal.className = "report-preview-overlay";
+        modal.innerHTML = `
+            <section class="report-preview-card branch-report-card">
+                <header class="report-preview-header">
+                    <div>
+                        <h2>${esc(ar ? "تقرير المقارنات التاريخية" : "Historical comparison report")}</h2>
+                        <p>${esc(ar ? "مقارنة 2023 لحد النهارده بنفس الفترة من كل سنة — مجمع أو لكل فرع" : "2023 to date, same period each year — consolidated or per branch")}</p>
+                    </div>
+                    <button type="button" class="icon-button" data-hr="close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+                </header>
+                <div class="report-preview-actions branch-report-actions">
+                    <label class="branch-report-select">
+                        <span>${esc(ar ? "التقرير" : "Report")}</span>
+                        <select id="historyReportSelect">${choices.map(c => `<option value="${esc(c.value)}">${esc(c.label)}</option>`).join("")}</select>
+                    </label>
+                    <label class="branch-report-select">
+                        <span>${esc(T().period)}</span>
+                        <select id="historyReportPeriod">
+                            <option value="ytd" ${state.period === "ytd" ? "selected" : ""}>${esc(T().ytd(meta().asOfDay, meta().asOfMonth))}</option>
+                            <option value="mtd" ${state.period === "mtd" ? "selected" : ""}>${esc(T().mtd(meta().asOfDay, meta().asOfMonth))}</option>
+                            <option value="full" ${state.period === "full" ? "selected" : ""}>${esc(T().full)}</option>
+                        </select>
+                    </label>
+                    <span style="flex:1"></span>
+                    <button class="secondary-button" type="button" data-hr="excel"><i class="fa-solid fa-file-excel"></i><span>${esc(T().excel)}</span></button>
+                    <button class="primary-button" type="button" data-hr="print"><i class="fa-solid fa-print"></i><span>${esc(T().print)}</span></button>
+                </div>
+                <iframe id="historyReportFrame" class="branch-report-frame" title="report"></iframe>
+            </section>`;
+        document.body.appendChild(modal);
+
+        const render = () => {
+            const frame = utils.byId("historyReportFrame");
+            if (frame) frame.srcdoc = buildReportDocument(selected.ids);
+        };
+        modal.addEventListener("click", event => {
+            if (event.target === modal) { closeReport(); return; }
+            const action = event.target.closest("[data-hr]")?.dataset.hr;
+            if (action === "close") closeReport();
+            if (action === "excel") exportExcel();
+            if (action === "print") {
+                const view = utils.byId("historyReportFrame")?.contentWindow;
+                if (!view) return;
+                const run = () => { try { view.focus(); view.print(); } catch (error) { printHTML(buildReportDocument(selected.ids)); } };
+                const ready = view.document?.fonts?.ready;
+                if (ready) ready.then(run).catch(run); else run();
+            }
+        });
+        utils.byId("historyReportSelect")?.addEventListener("change", event => {
+            selected = choices.find(c => c.value === event.target.value) || choices[0];
+            render();
+        });
+        utils.byId("historyReportPeriod")?.addEventListener("change", event => {
+            state.period = event.target.value;
+            render();
+        });
+        document.addEventListener("keydown", function onKey(event) {
+            if (event.key === "Escape") { closeReport(); document.removeEventListener("keydown", onKey); }
+        });
+        render();
     }
 
     /* ---------- الرسم الرئيسي ---------- */
@@ -38671,7 +38977,7 @@ window.DashboardHistory = (() => {
             return;
         }
 
-        root.innerHTML = `
+        root.innerHTML = fixBidi(`
             <article class="content-card hx-block hx-top">
                 ${controlsHTML(scope)}
                 <h2 class="hx-title">${esc(t.show)}: ${esc(scopeLabel(scope))}</h2>
@@ -38683,7 +38989,7 @@ window.DashboardHistory = (() => {
             ${monthlyHTML(scope)}
             ${customersHTML(scope)}
             ${productsHTML(scope)}
-        `;
+        `);
         drawCharts(scope);
     }
 
@@ -38735,7 +39041,7 @@ window.DashboardHistory = (() => {
         state.scopeId = "";
     }
 
-    return Object.freeze({ show, render, load, reset, buildInsights: scope => buildInsights(scope), _state: state });
+    return Object.freeze({ show, render, load, reset, openReport, buildInsights: scope => buildInsights(scope), _state: state });
 })();
 
 
