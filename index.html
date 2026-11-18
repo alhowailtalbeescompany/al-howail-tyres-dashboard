@@ -2761,6 +2761,7 @@ body.dark-mode .hx-table tr.hx-sep td { color: var(--primary); }
 .ct-badge { display: inline-block; margin-inline-start: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; vertical-align: middle; }
 .ct-badge.ct-credit { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
 .ct-badge.ct-cash { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+.ct-badge.ct-both { background: rgba(217, 119, 6, 0.14); color: #d97706; }
 .ct-split { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
 @media print {
@@ -21354,16 +21355,7 @@ window.DashboardProfiles = (() => {
             purchasingCustomerCount,
 
             customerSplit:
-                window.DashboardCustomerType?.splitKeys(
-                    customersList
-                        .filter(customer => customer.sales > 0)
-                        .map(customer => customer.customerCode || customer.customerName)
-                ) || null,
-
-            allCustomerSplit:
-                window.DashboardCustomerType?.splitKeys(
-                    customersList.map(customer => customer.customerCode || customer.customerName)
-                ) || null,
+                window.DashboardCustomerType?.splitRows(invoices) || null,
             purchasingCustomerPercentage,
 
             monthly:
@@ -22863,8 +22855,9 @@ window.DashboardProfiles = (() => {
             <div class="ps-activity">
                 ${stat(T("الفواتير", "Invoices"), n0(profile.invoiceCount))}
                 ${stat(T("عملاء اشتروا", "Buying customers"), `${n0(purchasing)} <small>/ ${n0(customerCount)}</small>`)}
-                ${profile.customerSplit ? stat(T("عملاء كرديت اشتروا", "Credit customers bought"), `${n0(profile.customerSplit.credit)} <small>/ ${n0(profile.allCustomerSplit ? profile.allCustomerSplit.credit : profile.customerSplit.credit)}</small>`) : ""}
-                ${profile.customerSplit ? stat(T("عملاء كاش اشتروا", "Cash customers bought"), `${n0(profile.customerSplit.cash)} <small>/ ${n0(profile.allCustomerSplit ? profile.allCustomerSplit.cash : profile.customerSplit.cash)}</small>`) : ""}
+                ${profile.customerSplit ? stat(T("عملاء كرديت", "Credit customers"), n0(profile.customerSplit.credit)) : ""}
+                ${profile.customerSplit ? stat(T("عملاء كاش", "Cash customers"), n0(profile.customerSplit.cash)) : ""}
+                ${profile.customerSplit ? stat(T("كرديت + كاش", "Both"), n0(profile.customerSplit.both)) : ""}
                 ${stat(T("نسبة الشراء", "Buying rate"), pct(profile.purchasingCustomerPercentage), utils.toNumber(profile.purchasingCustomerPercentage) < 40 ? "ps-warn" : "")}
                 ${visits ? stat(T("الزيارات", "Visits"), n0(visits.totalVisits)) : ""}
                 ${visits ? stat(T("تحويل الزيارات", "Visit conversion"), pct(visits.conversion)) : ""}
@@ -29836,7 +29829,9 @@ window.DashboardReports = (() => {
         }
 
         function customerTypeCard() {
-            const split = window.DashboardCustomerType?.splitRows(rows);
+            const split = report?.type === "sales"
+                ? window.DashboardCustomerType?.splitRows(currentData.invoices)
+                : window.DashboardCustomerType?.splitKeys(rows.map(row => row["Customer Code"] || row["Customer Name"]));
             return {
                 label: utils.getLanguage?.() === "en" ? "Credit / cash customers" : "عملاء كرديت / كاش",
                 value: split ? window.DashboardCustomerType.text(split) : "--"
@@ -31296,6 +31291,8 @@ window.DashboardSalesIntelligence = (() => {
                         .customerCodes
                         .add(customerCode);
                 }
+
+                window.DashboardCustomerType?.track(branchData, row);
             }
         );
 
@@ -31709,7 +31706,7 @@ window.DashboardSalesIntelligence = (() => {
                         </span>
                         ${window.DashboardCustomerType && branch.customerCodes ? `<span>
                             <i class="fa-solid fa-credit-card"></i>
-                            ${escapeHTML(window.DashboardCustomerType.text(window.DashboardCustomerType.splitKeys(branch.customerCodes)))}
+                            ${escapeHTML(window.DashboardCustomerType.text(window.DashboardCustomerType.splitTracked(branch)))}
                         </span>` : ""}
                         <span>
                             <i class="fa-solid fa-receipt"></i>
@@ -32683,6 +32680,7 @@ window.DashboardPresentation = (() => {
 
                 if (invoiceKey) aggregate.invoiceSet.add(invoiceKey);
                 if (customerKey) aggregate.customerSet.add(customerKey);
+                window.DashboardCustomerType?.track(aggregate, row);
 
                 addKeyed(aggregate.customerSales, customerKey, clean(row.customerName), amount, quantity);
                 addKeyed(aggregate.productSales, productKey, productLabel, amount, quantity);
@@ -32986,8 +32984,12 @@ window.DashboardPresentation = (() => {
             [tx("activeCustomers"), fmtInt(company.customerSet.size)],
             ...(window.DashboardCustomerType
                 ? (() => {
-                      const split = window.DashboardCustomerType.splitKeys(company.customerSet);
-                      return [[language() === "ar" ? "عملاء كرديت" : "Credit customers", fmtInt(split.credit)], [language() === "ar" ? "عملاء كاش" : "Cash customers", fmtInt(split.cash)]];
+                      const split = window.DashboardCustomerType.splitTracked(company);
+                      return [
+                          [language() === "ar" ? "عملاء كرديت" : "Credit customers", fmtInt(split.credit)],
+                          [language() === "ar" ? "عملاء كاش" : "Cash customers", fmtInt(split.cash)],
+                          [language() === "ar" ? "كرديت + كاش" : "Both", fmtInt(split.both)]
+                      ];
                   })()
                 : []),
             [tx("newCustomers"), fmtInt(company.newCustomers)],
@@ -33229,8 +33231,8 @@ window.DashboardPresentation = (() => {
                     ? (language() === "ar" ? "، " : ", ") +
                       (language() === "ar" ? `اشترى ${fmtInt(branch.customerSet.size)} عميل (` : `${fmtInt(branch.customerSet.size)} buying customers (`) +
                       (() => {
-                          const split = window.DashboardCustomerType.splitKeys(branch.customerSet);
-                          return language() === "ar" ? `كرديت ${fmtInt(split.credit)} • كاش ${fmtInt(split.cash)}` : `credit ${fmtInt(split.credit)} • cash ${fmtInt(split.cash)}`;
+                          const split = window.DashboardCustomerType.splitTracked(branch);
+                          return window.DashboardCustomerType.text(split, language() === "ar", fmtInt);
                       })() + ")"
                     : ""),
             body: `
@@ -34213,6 +34215,7 @@ window.DashboardBranchReport = (() => {
             activeCustomers: "العملاء المشترين",
             creditCustomers: "منهم كرديت",
             cashCustomers: "منهم كاش",
+            bothCustomers: "منهم كرديت + كاش",
             quantity: "الكمية المباعة",
             newCustomers: "عملاء جدد",
             reactivated: "عملاء معاد تنشيطهم",
@@ -34285,6 +34288,7 @@ window.DashboardBranchReport = (() => {
             activeCustomers: "Purchasing customers",
             creditCustomers: "of which credit",
             cashCustomers: "of which cash",
+            bothCustomers: "of which both",
             quantity: "Units sold",
             newCustomers: "New customers",
             reactivated: "Reactivated customers",
@@ -34569,6 +34573,7 @@ window.DashboardBranchReport = (() => {
                 aggregate.quantity += qty;
                 if (invoiceNo) aggregate.invoiceSet.add(invoiceNo);
                 if (customerKey) aggregate.customerSet.add(customerKey);
+                window.DashboardCustomerType?.track(aggregate, row);
                 addTo(aggregate.customers, customerKey, clean(row.customerName), amount, { invoiceNo });
                 addTo(aggregate.products, productKey, clean(row.productDescription) || clean(row.productCode), amount, { qty });
 
@@ -34781,8 +34786,8 @@ window.DashboardBranchReport = (() => {
             [t.activeCustomers, money(branch.customerSet.size)],
             ...(window.DashboardCustomerType
                 ? (() => {
-                      const split = window.DashboardCustomerType.splitKeys(branch.customerSet);
-                      return [[t.creditCustomers, money(split.credit)], [t.cashCustomers, money(split.cash)]];
+                      const split = window.DashboardCustomerType.splitTracked(branch);
+                      return [[t.creditCustomers, money(split.credit)], [t.cashCustomers, money(split.cash)], [t.bothCustomers, money(split.both)]];
                   })()
                 : []),
             [t.quantity, money(branch.quantity)]
@@ -35122,8 +35127,8 @@ ${selected.length || !selection ? body : `<p class="empty">${esc(t.noData)}</p>`
             [t.activeCustomers]: b.customerSet.size,
             ...(window.DashboardCustomerType
                 ? (() => {
-                      const split = window.DashboardCustomerType.splitKeys(b.customerSet);
-                      return { [t.creditCustomers]: split.credit, [t.cashCustomers]: split.cash };
+                      const split = window.DashboardCustomerType.splitTracked(b);
+                      return { [t.creditCustomers]: split.credit, [t.cashCustomers]: split.cash, [t.bothCustomers]: split.both };
                   })()
                 : {}),
             ...(model.hasNew ? { [t.newCustomers]: b.newList.length } : {}),
@@ -37173,7 +37178,8 @@ window.DashboardMonthlyReport = (() => {
                 [t.invoices, money(scope.invoiceCount)],
                 ...(scope.customerSplit ? [
                     [utils.getLanguage() === "en" ? "Credit customers bought" : "عملاء كرديت اشتروا", money(scope.customerSplit.credit)],
-                    [utils.getLanguage() === "en" ? "Cash customers bought" : "عملاء كاش اشتروا", money(scope.customerSplit.cash)]
+                    [utils.getLanguage() === "en" ? "Cash customers bought" : "عملاء كاش اشتروا", money(scope.customerSplit.cash)],
+                    [utils.getLanguage() === "en" ? "Bought credit + cash" : "اشتروا كرديت + كاش", money(scope.customerSplit.both)]
                 ] : []),
                 [t.overdue, money(scope.overdue), "is-bad"],
                 [t.untargeted, money(scope.untargetedSales)]
@@ -37190,7 +37196,8 @@ window.DashboardMonthlyReport = (() => {
                 [t.invoices, money(scope.invoiceCount)],
                 ...(scope.customerSplit ? [
                     [utils.getLanguage() === "en" ? "Credit customers bought" : "عملاء كرديت اشتروا", money(scope.customerSplit.credit)],
-                    [utils.getLanguage() === "en" ? "Cash customers bought" : "عملاء كاش اشتروا", money(scope.customerSplit.cash)]
+                    [utils.getLanguage() === "en" ? "Cash customers bought" : "عملاء كاش اشتروا", money(scope.customerSplit.cash)],
+                    [utils.getLanguage() === "en" ? "Bought credit + cash" : "اشتروا كرديت + كاش", money(scope.customerSplit.both)]
                 ] : []),
                 [t.overdue, money(scope.overdue), "is-bad"],
                 [t.due, money(scope.due)],
@@ -37525,7 +37532,8 @@ ${row(c, true)}
             [t.invoices]: s.invoiceCount,
             ...(s.customerSplit ? {
                 [utils.getLanguage() === "en" ? "Credit customers" : "عملاء كرديت"]: s.customerSplit.credit,
-                [utils.getLanguage() === "en" ? "Cash customers" : "عملاء كاش"]: s.customerSplit.cash
+                [utils.getLanguage() === "en" ? "Cash customers" : "عملاء كاش"]: s.customerSplit.cash,
+                [utils.getLanguage() === "en" ? "Both" : "كرديت + كاش"]: s.customerSplit.both
             } : {}),
             [t.overdue]: Math.round(s.overdue),
             [t.untargeted]: Math.round(s.untargetedSales)
@@ -39168,80 +39176,105 @@ window.DashboardHistory = (() => {
 
 
 /* =========================================================
-   نوع العميل: كرديت / كاش
-   1) من شيت Customers info Credit&Cash (حد ائتمان > 0 = كرديت)
-   2) لو العميل مش في الشيت: لو عنده أي فاتورة كرديت = كرديت، غير كده كاش
+   عملاء كرديت / كاش (من الفواتير في الفترة المختارة)
+   كرديت = عنده فاتورة كرديت • كاش = عنده فاتورة كاش
+   الاتنين = عنده الاتنين (محسوب في الكرديت وفي الكاش)
 ========================================================= */
 window.DashboardCustomerType = (() => {
     const utils = window.DashboardUtils;
-    let types = new Map();
+    let flags = new Map();
     const key = value => {
         const text = String(value == null ? "" : value).trim();
         if (!text) return "";
         const code = utils?.normalizeCode ? utils.normalizeCode(text) : text;
         return String(code).replace(/^0+(?=\d)/, "").toUpperCase();
     };
-    const nameKey = value => "N:" + String(value == null ? "" : value).trim().toUpperCase();
+    const rowKey = row => key(row?.customerCode || row?.["Customer Code"] || "") || (row?.customerName ? "N:" + String(row.customerName).trim().toUpperCase() : "");
     const isCashInvoice = row => /cash|نقد|كاش/i.test(String(row?.invoiceType || row?.["Invoice Type"] || ""));
 
-    function setData(info = [], invoices = []) {
-        types = new Map();
-        (Array.isArray(invoices) ? invoices : []).forEach(row => {
-            const t = isCashInvoice(row) ? "cash" : "credit";
-            [key(row.customerCode), row.customerName ? nameKey(row.customerName) : ""].filter(Boolean).forEach(k => {
-                if (t === "credit") types.set(k, "credit");
-                else if (!types.has(k)) types.set(k, "cash");
-            });
+    function flagsFrom(rows) {
+        const map = new Map();
+        (Array.isArray(rows) ? rows : []).forEach(row => {
+            const k = rowKey(row);
+            if (!k) return;
+            const f = map.get(k) || { credit: false, cash: false };
+            if (isCashInvoice(row)) f.cash = true; else f.credit = true;
+            map.set(k, f);
         });
-        (Array.isArray(info) ? info : []).forEach(row => {
-            const limit = Number(String(row.creditLimit ?? "").replace(/,/g, "")) || 0;
-            const declared = String(row.paymentType || "");
-            const t = limit > 0 || /credit|كرديت|آجل/i.test(declared) && !/cash/i.test(declared) ? "credit" : "cash";
-            const k = key(row.customerCode);
-            if (k) types.set(k, t);
-            if (row.customerName) types.set(nameKey(row.customerName), t);
-        });
+        return map;
     }
 
-    /* value = كود العميل (أو الاسم لو مفيش كود) */
-    function typeOf(value, name) {
-        return types.get(key(value)) || types.get(nameKey(value)) || (name ? types.get(nameKey(name)) : "") || "cash";
+    function summarize(map) {
+        let credit = 0, cash = 0, both = 0;
+        map.forEach(f => {
+            if (f.credit) credit += 1;
+            if (f.cash) cash += 1;
+            if (f.credit && f.cash) both += 1;
+        });
+        return { total: map.size, credit, cash, both, creditOnly: credit - both, cashOnly: cash - both };
     }
 
-    function splitKeys(values) {
-        const seen = new Set();
-        let credit = 0, cash = 0;
-        Array.from(values || []).forEach(value => {
-            const k = key(value) || String(value || "");
-            if (!k || seen.has(k)) return;
-            seen.add(k);
-            if (typeOf(value) === "credit") credit += 1; else cash += 1;
-        });
-        return { total: credit + cash, credit, cash };
+    /* الفواتير بعد الفلاتر (تتنادى من distributeData) */
+    function setData(info, invoices = []) {
+        flags = flagsFrom(invoices);
     }
 
     function splitRows(rows) {
-        return splitKeys((rows || []).map(row => row?.customerCode || row?.["Customer Code"] || row?.customerName || ""));
+        return summarize(flagsFrom(rows));
+    }
+
+    /* مجموعة أكواد عملاء: نوع كل عميل من فواتير الفترة */
+    function splitKeys(values) {
+        const map = new Map();
+        Array.from(values || []).forEach(value => {
+            const k = key(value) || String(value || "");
+            if (!k || map.has(k)) return;
+            map.set(k, flags.get(k) || flags.get("N:" + String(value || "").trim().toUpperCase()) || { credit: false, cash: false });
+        });
+        return summarize(map);
+    }
+
+    /* تتبع داخل تجميعة (فرع / شركة) عشان العدد يبقى من فواتير التجميعة نفسها */
+    function track(aggregate, row) {
+        if (!aggregate) return;
+        if (!aggregate.__ctRows) aggregate.__ctRows = [];
+        aggregate.__ctRows.push(row);
+    }
+
+    function splitTracked(aggregate) {
+        return splitRows(aggregate && aggregate.__ctRows ? aggregate.__ctRows : []);
+    }
+
+    function typeOf(value, name) {
+        const f = flags.get(key(value)) || (name ? flags.get("N:" + String(name).trim().toUpperCase()) : null) || flags.get("N:" + String(value || "").trim().toUpperCase());
+        if (!f) return "";
+        return f.credit && f.cash ? "both" : f.credit ? "credit" : "cash";
     }
 
     const isAr = () => (utils?.getLanguage?.() || "ar") !== "en";
     const fmt = n => (utils?.formatNumber ? utils.formatNumber(n || 0, 0) : new Intl.NumberFormat("en-US").format(n || 0));
 
-    function text(split, ar = isAr()) {
+    function text(split, ar = isAr(), format = fmt) {
         if (!split) return "";
-        return ar ? `كرديت ${fmt(split.credit)} • كاش ${fmt(split.cash)}` : `Credit ${fmt(split.credit)} • Cash ${fmt(split.cash)}`;
+        return ar
+            ? `كرديت ${format(split.credit)} • كاش ${format(split.cash)} • الاتنين ${format(split.both)}`
+            : `Credit ${format(split.credit)} • Cash ${format(split.cash)} • Both ${format(split.both)}`;
     }
 
     function label(value, ar = isAr(), name) {
-        return typeOf(value, name) === "credit" ? (ar ? "كرديت" : "Credit") : (ar ? "كاش" : "Cash");
+        const t = typeOf(value, name);
+        if (t === "both") return ar ? "كرديت + كاش" : "Credit + Cash";
+        if (t === "credit") return ar ? "كرديت" : "Credit";
+        if (t === "cash") return ar ? "كاش" : "Cash";
+        return "";
     }
 
     function badge(value, name) {
         const t = typeOf(value, name);
-        return `<span class="ct-badge ct-${t}">${label(value, isAr(), name)}</span>`;
+        return t ? `<span class="ct-badge ct-${t}">${label(value, isAr(), name)}</span>` : "";
     }
 
-    return Object.freeze({ setData, typeOf, splitKeys, splitRows, text, label, badge });
+    return Object.freeze({ setData, splitRows, splitKeys, track, splitTracked, typeOf, text, label, badge });
 })();
 
 window.DashboardApp = (() => {
@@ -40240,8 +40273,8 @@ window.DashboardApp = (() => {
 
     function distributeData(data) {
         window.DashboardCustomerType?.setData(
-            state.rawData?.customerInfo || data.customerInfo || [],
-            state.rawData?.invoices || data.invoices || []
+            data.customerInfo || [],
+            data.invoices || []
         );
 
         /*
