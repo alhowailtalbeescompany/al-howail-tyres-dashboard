@@ -2758,6 +2758,11 @@ body.dark-mode .hx-table tr.hx-sep td { color: var(--primary); }
     .hx-table td, .hx-table th { white-space: normal; }
 }
 
+.ct-badge { display: inline-block; margin-inline-start: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; vertical-align: middle; }
+.ct-badge.ct-credit { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+.ct-badge.ct-cash { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+.ct-split { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
 @media print {
     body {
         background: #ffffff !important;
@@ -5866,6 +5871,31 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                         <article class="kpi-card">
 
                             <div class="kpi-card-header">
+                                <span data-i18n="dashboard.buyingCustomers">
+                                    العملاء المشترين
+                                </span>
+
+                                <div class="kpi-icon">
+                                    <i class="fa-solid fa-users"></i>
+                                </div>
+                            </div>
+
+                            <strong
+                                class="kpi-value"
+                                id="buyingCustomersKpi"
+                            >
+                                0
+                            </strong>
+
+                            <small id="buyingCustomersNote">
+                                --
+                            </small>
+
+                        </article>
+
+                        <article class="kpi-card">
+
+                            <div class="kpi-card-header">
                                 <span data-i18n="dashboard.averageInvoice">
                                     متوسط الفاتورة
                                 </span>
@@ -8325,6 +8355,7 @@ const TRANSLATIONS = {
             averageInvoice: "متوسط الفاتورة",
             invoiceCount: "عدد الفواتير",
             activeCustomers: "العملاء النشطون",
+            buyingCustomers: "العملاء المشترين",
             newCustomers: "العملاء الجدد",
             reactivatedCustomers: "العملاء المعاد تنشيطهم",
             selectedPeriod: "خلال الفترة المختارة",
@@ -8772,6 +8803,7 @@ const TRANSLATIONS = {
             averageInvoice: "Average Invoice",
             invoiceCount: "Invoice Count",
             activeCustomers: "Active Customers",
+            buyingCustomers: "Buying customers",
             newCustomers: "New Customers",
             reactivatedCustomers: "Reactivated Customers",
             selectedPeriod: "During selected period",
@@ -13148,6 +13180,9 @@ window.DashboardDashboard = (() => {
             activeCustomerCount:
                 activeCustomers.size,
 
+            customerSplit:
+                window.DashboardCustomerType?.splitRows(invoices) || null,
+
             overdueCustomerCount:
                 overdueCustomers.size
         };
@@ -13270,7 +13305,10 @@ window.DashboardDashboard = (() => {
                 utils.toNumber(
                     serverSummary.overdueCustomerCount ??
                     fallback.overdueCustomerCount
-                )
+                ),
+
+            customerSplit:
+                fallback.customerSplit
         };
     }
 
@@ -13500,6 +13538,12 @@ window.DashboardDashboard = (() => {
                 summary.invoiceCount
             )
         );
+
+        {
+            const split = summary.customerSplit;
+            utils.setText("buyingCustomersKpi", utils.formatNumber(split ? split.total : 0));
+            utils.setText("buyingCustomersNote", split ? window.DashboardCustomerType.text(split) : "--");
+        }
 
         utils.setText(
             "averageInvoiceKpi",
@@ -21308,6 +21352,18 @@ window.DashboardProfiles = (() => {
                 customersList,
 
             purchasingCustomerCount,
+
+            customerSplit:
+                window.DashboardCustomerType?.splitKeys(
+                    customersList
+                        .filter(customer => customer.sales > 0)
+                        .map(customer => customer.customerCode || customer.customerName)
+                ) || null,
+
+            allCustomerSplit:
+                window.DashboardCustomerType?.splitKeys(
+                    customersList.map(customer => customer.customerCode || customer.customerName)
+                ) || null,
             purchasingCustomerPercentage,
 
             monthly:
@@ -22190,7 +22246,7 @@ window.DashboardProfiles = (() => {
                     ${utils.escapeHTML(
                         customer.customerName ||
                             "--"
-                    )}
+                    )}${window.DashboardCustomerType ? (forPrint ? ` <small>(${window.DashboardCustomerType.label(customer.customerCode || customer.customerName, undefined, customer.customerName)})</small>` : window.DashboardCustomerType.badge(customer.customerCode || customer.customerName, customer.customerName)) : ""}
                 </td>
 
                 <td>
@@ -22807,6 +22863,8 @@ window.DashboardProfiles = (() => {
             <div class="ps-activity">
                 ${stat(T("الفواتير", "Invoices"), n0(profile.invoiceCount))}
                 ${stat(T("عملاء اشتروا", "Buying customers"), `${n0(purchasing)} <small>/ ${n0(customerCount)}</small>`)}
+                ${profile.customerSplit ? stat(T("عملاء كرديت اشتروا", "Credit customers bought"), `${n0(profile.customerSplit.credit)} <small>/ ${n0(profile.allCustomerSplit ? profile.allCustomerSplit.credit : profile.customerSplit.credit)}</small>`) : ""}
+                ${profile.customerSplit ? stat(T("عملاء كاش اشتروا", "Cash customers bought"), `${n0(profile.customerSplit.cash)} <small>/ ${n0(profile.allCustomerSplit ? profile.allCustomerSplit.cash : profile.customerSplit.cash)}</small>`) : ""}
                 ${stat(T("نسبة الشراء", "Buying rate"), pct(profile.purchasingCustomerPercentage), utils.toNumber(profile.purchasingCustomerPercentage) < 40 ? "ps-warn" : "")}
                 ${visits ? stat(T("الزيارات", "Visits"), n0(visits.totalVisits)) : ""}
                 ${visits ? stat(T("تحويل الزيارات", "Visit conversion"), pct(visits.conversion)) : ""}
@@ -23089,6 +23147,9 @@ window.DashboardProfiles = (() => {
 
                 "Customer Name":
                     customer.customerName,
+
+                "Customer Type":
+                    window.DashboardCustomerType?.label(customer.customerCode || customer.customerName, false, customer.customerName) || "",
 
                 "Last Purchase":
                     utils.formatDate(
@@ -29255,6 +29316,7 @@ window.DashboardReports = (() => {
                 "Invoice Date": formatDate(invoiceDate(row)),
                 "Customer Code": customerCode(row),
                 "Customer Name": customerName(row),
+                "Customer Type": window.DashboardCustomerType?.label(customerCode(row) || customerName(row), utils.getLanguage?.() !== "en", customerName(row)) || "",
                 "Salesman Code": canonicalSalesman(row).code,
                 "Salesman Name": canonicalSalesman(row).name,
                 "Branch": canonicalSalesman(row).branch || branch(row),
@@ -29773,6 +29835,14 @@ window.DashboardReports = (() => {
             return values.size;
         }
 
+        function customerTypeCard() {
+            const split = window.DashboardCustomerType?.splitRows(rows);
+            return {
+                label: utils.getLanguage?.() === "en" ? "Credit / cash customers" : "عملاء كرديت / كاش",
+                value: split ? window.DashboardCustomerType.text(split) : "--"
+            };
+        }
+
         const recordsCard = {
             label: utils.t("common.records", "عدد السجلات"),
             value: utils.formatNumber(rows.length)
@@ -29789,6 +29859,7 @@ window.DashboardReports = (() => {
                     label: utils.t("reports.customersCount", "عدد العملاء"),
                     value: utils.formatNumber(uniqueCount("Customer Code"))
                 },
+                customerTypeCard(),
                 {
                     label: utils.t("reports.salesmenCount", "عدد المندوبين"),
                     value: utils.formatNumber(uniqueCount("Salesman Code"))
@@ -29822,6 +29893,7 @@ window.DashboardReports = (() => {
                     label: utils.t("reports.customersCount", "عدد العملاء"),
                     value: utils.formatNumber(uniqueCount("Customer Code"))
                 },
+                customerTypeCard(),
                 {
                     label: utils.t("reports.salesmenCount", "عدد المندوبين"),
                     value: utils.formatNumber(uniqueCount("Salesman Code"))
@@ -29850,7 +29922,8 @@ window.DashboardReports = (() => {
                 {
                     label: utils.t("reports.customersCount", "عدد العملاء"),
                     value: utils.formatNumber(uniqueCount("Customer Code"))
-                }
+                },
+                customerTypeCard()
             ];
         }
 
@@ -31634,6 +31707,10 @@ window.DashboardSalesIntelligence = (() => {
                             ${escapeHTML(utils.t("dashboard.activeCustomers", "العملاء"))}
                             <strong>${escapeHTML(utils.formatNumber(branch.customerCount))}</strong>
                         </span>
+                        ${window.DashboardCustomerType && branch.customerCodes ? `<span>
+                            <i class="fa-solid fa-credit-card"></i>
+                            ${escapeHTML(window.DashboardCustomerType.text(window.DashboardCustomerType.splitKeys(branch.customerCodes)))}
+                        </span>` : ""}
                         <span>
                             <i class="fa-solid fa-receipt"></i>
                             ${escapeHTML(utils.t("dashboard.invoiceCount", "الفواتير"))}
@@ -32052,6 +32129,7 @@ window.DashboardPresentation = (() => {
             notDueValue: "غير مستحق بعد: {value}",
             invoices: "عدد الفواتير",
             activeCustomers: "العملاء النشطون",
+            buyingCustomers: "العملاء المشترين",
             newCustomers: "عملاء جدد",
             reactivated: "عملاء معاد تنشيطهم",
             quantity: "الكمية المباعة",
@@ -32906,6 +32984,12 @@ window.DashboardPresentation = (() => {
         const stats = [
             [tx("invoices"), fmtInt(company.invoiceSet.size)],
             [tx("activeCustomers"), fmtInt(company.customerSet.size)],
+            ...(window.DashboardCustomerType
+                ? (() => {
+                      const split = window.DashboardCustomerType.splitKeys(company.customerSet);
+                      return [[language() === "ar" ? "عملاء كرديت" : "Credit customers", fmtInt(split.credit)], [language() === "ar" ? "عملاء كاش" : "Cash customers", fmtInt(split.cash)]];
+                  })()
+                : []),
             [tx("newCustomers"), fmtInt(company.newCustomers)],
             [tx("reactivated"), fmtInt(company.reactivated)],
             ...(model.hasVisits
@@ -33140,7 +33224,15 @@ window.DashboardPresentation = (() => {
             subtitle:
                 tx("branchRank", { rank, total: model.branches.length }) +
                 (language() === "ar" ? "، " : ", ") +
-                tx("branchCustomers", { new: fmtInt(branch.newCustomers), re: fmtInt(branch.reactivated) }),
+                tx("branchCustomers", { new: fmtInt(branch.newCustomers), re: fmtInt(branch.reactivated) }) +
+                (window.DashboardCustomerType && branch.customerSet
+                    ? (language() === "ar" ? "، " : ", ") +
+                      (language() === "ar" ? `اشترى ${fmtInt(branch.customerSet.size)} عميل (` : `${fmtInt(branch.customerSet.size)} buying customers (`) +
+                      (() => {
+                          const split = window.DashboardCustomerType.splitKeys(branch.customerSet);
+                          return language() === "ar" ? `كرديت ${fmtInt(split.credit)} • كاش ${fmtInt(split.cash)}` : `credit ${fmtInt(split.credit)} • cash ${fmtInt(split.cash)}`;
+                      })() + ")"
+                    : ""),
             body: `
                 <div class="pz-kpis is-compact" style="--cols:6">
                     ${kpi(tx("sales"), fmtCompact(branch.sales), "SAR " + fmtInt(branch.sales))}
@@ -34119,6 +34211,8 @@ window.DashboardBranchReport = (() => {
             invoices: "عدد الفواتير",
             avgInvoice: "متوسط الفاتورة",
             activeCustomers: "العملاء المشترين",
+            creditCustomers: "منهم كرديت",
+            cashCustomers: "منهم كاش",
             quantity: "الكمية المباعة",
             newCustomers: "عملاء جدد",
             reactivated: "عملاء معاد تنشيطهم",
@@ -34189,6 +34283,8 @@ window.DashboardBranchReport = (() => {
             invoices: "Invoices",
             avgInvoice: "Average invoice",
             activeCustomers: "Purchasing customers",
+            creditCustomers: "of which credit",
+            cashCustomers: "of which cash",
             quantity: "Units sold",
             newCustomers: "New customers",
             reactivated: "Reactivated customers",
@@ -34683,6 +34779,12 @@ window.DashboardBranchReport = (() => {
             [t.invoices, money(invoices)],
             [t.avgInvoice, invoices ? money(branch.sales / invoices) : "—"],
             [t.activeCustomers, money(branch.customerSet.size)],
+            ...(window.DashboardCustomerType
+                ? (() => {
+                      const split = window.DashboardCustomerType.splitKeys(branch.customerSet);
+                      return [[t.creditCustomers, money(split.credit)], [t.cashCustomers, money(split.cash)]];
+                  })()
+                : []),
             [t.quantity, money(branch.quantity)]
         ];
 
@@ -35018,6 +35120,12 @@ ${selected.length || !selection ? body : `<p class="empty">${esc(t.noData)}</p>`
             [t.overdue]: Math.round(b.overdue),
             [t.invoices]: b.invoiceSet.size,
             [t.activeCustomers]: b.customerSet.size,
+            ...(window.DashboardCustomerType
+                ? (() => {
+                      const split = window.DashboardCustomerType.splitKeys(b.customerSet);
+                      return { [t.creditCustomers]: split.credit, [t.cashCustomers]: split.cash };
+                  })()
+                : {}),
             ...(model.hasNew ? { [t.newCustomers]: b.newList.length } : {}),
             ...(model.hasReactivated ? { [t.reactivated]: b.reactivatedList.length } : {}),
             ...(model.hasVisits ? { [t.visits]: b.visits, [t.conversion]: b.visits ? +(b.visitInvoices / b.visits * 100).toFixed(1) : "" } : {})
@@ -37012,6 +37120,7 @@ window.DashboardMonthlyReport = (() => {
             ...project(scope.targetedSales, scope.target),
             untargetedSales: scope.sales - scope.targetedSales,
             invoiceCount: scope.invoiceSet.size,
+            customerSplit: window.DashboardCustomerType ? window.DashboardCustomerType.splitRows(scope.invoiceRows) : null,
             mix: window.DashboardProductMix ? window.DashboardProductMix.summarize(scope.invoiceRows) : null,
             topOverdue: [...scope.overdueCustomers.values()].sort((a, b) => b.amount - a.amount).slice(0, 10),
             upcoming: [...scope.upcoming].sort((a, b) => a.remaining - b.remaining || b.amount - a.amount),
@@ -37062,6 +37171,10 @@ window.DashboardMonthlyReport = (() => {
                 [t.collections, money(scope.collections)],
                 ...(hasCash() ? [[t.cash, money(scope.cash)]] : []),
                 [t.invoices, money(scope.invoiceCount)],
+                ...(scope.customerSplit ? [
+                    [utils.getLanguage() === "en" ? "Credit customers bought" : "عملاء كرديت اشتروا", money(scope.customerSplit.credit)],
+                    [utils.getLanguage() === "en" ? "Cash customers bought" : "عملاء كاش اشتروا", money(scope.customerSplit.cash)]
+                ] : []),
                 [t.overdue, money(scope.overdue), "is-bad"],
                 [t.untargeted, money(scope.untargetedSales)]
             ]
@@ -37075,6 +37188,10 @@ window.DashboardMonthlyReport = (() => {
                 [t.collections, money(scope.collections)],
                 ...(hasCash() ? [[t.cash, money(scope.cash)]] : []),
                 [t.invoices, money(scope.invoiceCount)],
+                ...(scope.customerSplit ? [
+                    [utils.getLanguage() === "en" ? "Credit customers bought" : "عملاء كرديت اشتروا", money(scope.customerSplit.credit)],
+                    [utils.getLanguage() === "en" ? "Cash customers bought" : "عملاء كاش اشتروا", money(scope.customerSplit.cash)]
+                ] : []),
                 [t.overdue, money(scope.overdue), "is-bad"],
                 [t.due, money(scope.due)],
                 [t.upcoming7, money(scope.upcomingTotal)],
@@ -37406,6 +37523,10 @@ ${row(c, true)}
             [t.collections]: Math.round(s.collections),
             ...(hasCash() ? { [t.cash]: Math.round(s.cash) } : {}),
             [t.invoices]: s.invoiceCount,
+            ...(s.customerSplit ? {
+                [utils.getLanguage() === "en" ? "Credit customers" : "عملاء كرديت"]: s.customerSplit.credit,
+                [utils.getLanguage() === "en" ? "Cash customers" : "عملاء كاش"]: s.customerSplit.cash
+            } : {}),
             [t.overdue]: Math.round(s.overdue),
             [t.untargeted]: Math.round(s.untargetedSales)
         });
@@ -39045,6 +39166,84 @@ window.DashboardHistory = (() => {
 })();
 
 
+
+/* =========================================================
+   نوع العميل: كرديت / كاش
+   1) من شيت Customers info Credit&Cash (حد ائتمان > 0 = كرديت)
+   2) لو العميل مش في الشيت: لو عنده أي فاتورة كرديت = كرديت، غير كده كاش
+========================================================= */
+window.DashboardCustomerType = (() => {
+    const utils = window.DashboardUtils;
+    let types = new Map();
+    const key = value => {
+        const text = String(value == null ? "" : value).trim();
+        if (!text) return "";
+        const code = utils?.normalizeCode ? utils.normalizeCode(text) : text;
+        return String(code).replace(/^0+(?=\d)/, "").toUpperCase();
+    };
+    const nameKey = value => "N:" + String(value == null ? "" : value).trim().toUpperCase();
+    const isCashInvoice = row => /cash|نقد|كاش/i.test(String(row?.invoiceType || row?.["Invoice Type"] || ""));
+
+    function setData(info = [], invoices = []) {
+        types = new Map();
+        (Array.isArray(invoices) ? invoices : []).forEach(row => {
+            const t = isCashInvoice(row) ? "cash" : "credit";
+            [key(row.customerCode), row.customerName ? nameKey(row.customerName) : ""].filter(Boolean).forEach(k => {
+                if (t === "credit") types.set(k, "credit");
+                else if (!types.has(k)) types.set(k, "cash");
+            });
+        });
+        (Array.isArray(info) ? info : []).forEach(row => {
+            const limit = Number(String(row.creditLimit ?? "").replace(/,/g, "")) || 0;
+            const declared = String(row.paymentType || "");
+            const t = limit > 0 || /credit|كرديت|آجل/i.test(declared) && !/cash/i.test(declared) ? "credit" : "cash";
+            const k = key(row.customerCode);
+            if (k) types.set(k, t);
+            if (row.customerName) types.set(nameKey(row.customerName), t);
+        });
+    }
+
+    /* value = كود العميل (أو الاسم لو مفيش كود) */
+    function typeOf(value, name) {
+        return types.get(key(value)) || types.get(nameKey(value)) || (name ? types.get(nameKey(name)) : "") || "cash";
+    }
+
+    function splitKeys(values) {
+        const seen = new Set();
+        let credit = 0, cash = 0;
+        Array.from(values || []).forEach(value => {
+            const k = key(value) || String(value || "");
+            if (!k || seen.has(k)) return;
+            seen.add(k);
+            if (typeOf(value) === "credit") credit += 1; else cash += 1;
+        });
+        return { total: credit + cash, credit, cash };
+    }
+
+    function splitRows(rows) {
+        return splitKeys((rows || []).map(row => row?.customerCode || row?.["Customer Code"] || row?.customerName || ""));
+    }
+
+    const isAr = () => (utils?.getLanguage?.() || "ar") !== "en";
+    const fmt = n => (utils?.formatNumber ? utils.formatNumber(n || 0, 0) : new Intl.NumberFormat("en-US").format(n || 0));
+
+    function text(split, ar = isAr()) {
+        if (!split) return "";
+        return ar ? `كرديت ${fmt(split.credit)} • كاش ${fmt(split.cash)}` : `Credit ${fmt(split.credit)} • Cash ${fmt(split.cash)}`;
+    }
+
+    function label(value, ar = isAr(), name) {
+        return typeOf(value, name) === "credit" ? (ar ? "كرديت" : "Credit") : (ar ? "كاش" : "Cash");
+    }
+
+    function badge(value, name) {
+        const t = typeOf(value, name);
+        return `<span class="ct-badge ct-${t}">${label(value, isAr(), name)}</span>`;
+    }
+
+    return Object.freeze({ setData, typeOf, splitKeys, splitRows, text, label, badge });
+})();
+
 window.DashboardApp = (() => {
     const config = window.DashboardConfig;
     const utils = window.DashboardUtils;
@@ -40040,6 +40239,11 @@ window.DashboardApp = (() => {
     ===================================================== */
 
     function distributeData(data) {
+        window.DashboardCustomerType?.setData(
+            state.rawData?.customerInfo || data.customerInfo || [],
+            state.rawData?.invoices || data.invoices || []
+        );
+
         /*
          * dashboard.js لا يحتوي على setData.
          * يجب إرسال البيانات مباشرة إلى render.
