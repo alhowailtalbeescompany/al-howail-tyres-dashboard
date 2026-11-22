@@ -2764,6 +2764,30 @@ body.dark-mode .hx-table tr.hx-sep td { color: var(--primary); }
 .ct-badge.ct-both { background: rgba(217, 119, 6, 0.14); color: #d97706; }
 .ct-split { display: block; font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
+.dc-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+.dc-controls label { display: grid; gap: 4px; font-size: 12px; color: var(--text-secondary); min-width: 190px; flex: 1 1 190px; }
+.dc-controls select { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-primary); font: inherit; }
+.dc-actions { display: flex; gap: 8px; }
+.dc-wrap { overflow-x: auto; }
+.dc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dc-table th, .dc-table td { padding: 7px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: start; }
+.dc-table thead th { background: var(--surface-soft); color: var(--text-secondary); font-weight: 700; }
+.dc-table th.dc-group { text-align: center; color: var(--text-primary); }
+.dc-table th.dc-g-overdue { border-bottom: 2px solid var(--danger); }
+.dc-table th.dc-g-due { border-bottom: 2px solid var(--warning, #d97706); }
+.dc-table td.n, .dc-table th.n { text-align: end; font-variant-numeric: tabular-nums; }
+.dc-table tfoot td { font-weight: 800; border-top: 2px solid var(--border-strong); background: var(--surface-soft); }
+.dc-name { white-space: normal !important; min-width: 180px; }
+.dc-st { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+.dc-bad { background: var(--danger-light); color: var(--danger); }
+.dc-good { background: var(--success-light); color: var(--success); }
+.dc-up { color: #d97706; }
+.dc-down { color: var(--info); }
+.dc-same { color: var(--text-muted); }
+.dc-bad-t { color: var(--danger); }
+.dc-good-t { color: var(--success); }
+.dc-note, .dc-empty { font-size: 12px; color: var(--text-secondary); margin: 8px 0 0; line-height: 1.7; }
+
 @media print {
     body {
         background: #ffffff !important;
@@ -6529,6 +6553,16 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                         <div id="dueByCodeList" class="dbc-list"></div>
                     </article>
 
+                    <article class="content-card due-compare-card" style="margin-bottom: 18px">
+                        <div class="card-header page-card-header">
+                            <div>
+                                <h3 data-i18n="dueOverdue.compareTitle">مقارنة المديونية لكل مندوب (قديم / جديد)</h3>
+                                <p data-i18n="dueOverdue.compareSubtitle">المتأخرات والمستحقات بين أي لقطتين: بعد السداد أو زيادة المبالغ</p>
+                            </div>
+                        </div>
+                        <div id="dueCompareRoot"></div>
+                    </article>
+
                     <article class="content-card">
 
                         <div class="card-header page-card-header">
@@ -8448,6 +8482,8 @@ const TRANSLATIONS = {
 
         dueOverdue: {
             byCodeTitle: "المديونية حسب الكود",
+            compareTitle: "مقارنة المديونية لكل مندوب (قديم / جديد)",
+            compareSubtitle: "المتأخرات والمستحقات بين أي لقطتين: بعد السداد أو زيادة المبالغ",
             byCodeSubtitle: "المتأخرات والمستحقات على كل كود، ونسبته من الإجمالي",
             byCodeSort: "ترتيب حسب",
             byCodeSortOverdue: "المتأخرات",
@@ -8895,7 +8931,9 @@ const TRANSLATIONS = {
         },
 
         dueOverdue: {
-            byCodeTitle: "Receivables by Code",
+            byCodeTitle: "Receivables by code",
+            compareTitle: "Salesman comparison — old vs new",
+            compareSubtitle: "Overdue and due between any two snapshots: after payments or new balances",
             byCodeSubtitle: "Overdue and due balance on each code, and its share of the total",
             byCodeSort: "Sort by",
             byCodeSortOverdue: "Overdue",
@@ -10432,6 +10470,11 @@ window.DashboardAPI = (() => {
             cashCollections:
                 Array.isArray(response?.cashCollections)
                     ? response.cashCollections
+                    : [],
+
+            dueSnapshots:
+                Array.isArray(response?.dueSnapshots)
+                    ? response.dueSnapshots
                     : [],
 
             visits: (() => {
@@ -39277,6 +39320,222 @@ window.DashboardCustomerType = (() => {
     return Object.freeze({ setData, splitRows, splitKeys, track, splitTracked, typeOf, text, label, badge });
 })();
 
+/* =========================================================
+   مقارنة المديونية بين لقطتين (قديم / جديد) لكل مندوب
+   البيانات: dueSnapshots من السيرفر (شيت Due Snapshots)
+========================================================= */
+window.DashboardDueCompare = (() => {
+    const utils = window.DashboardUtils;
+    const state = { oldKey: "", newKey: "", branch: "", metric: "both" };
+
+    const ar = () => utils.getLanguage() !== "en";
+    const T = (a, e) => (ar() ? a : e);
+    const esc = v => utils.escapeHTML(String(v == null ? "" : v));
+    const money = v => `SAR ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(Math.abs(v)))}`;
+    const signedMoney = v => (Math.round(v) === 0 ? "-" : v < 0 ? `(${money(v)})` : money(v));
+    const pct = (n, o) => {
+        if (!o) return n ? "—" : "-";
+        const p = ((n - o) / Math.abs(o)) * 100;
+        if (Math.abs(p) < 0.05) return "-";
+        const t = `${Math.abs(p).toFixed(1)}%`;
+        return p < 0 ? `(${t})` : t;
+    };
+    const rows = () => (Array.isArray(window.DashboardDueSnapshots) ? window.DashboardDueSnapshots : []);
+    const keys = () => [...new Set(rows().map(r => r.snapshotAt))].sort();
+
+    function label(key) {
+        const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        const when = m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}` : key;
+        const extract = (rows().find(r => r.snapshotAt === key) || {}).extractDate;
+        return extract ? `${when}  •  ${T("بيانات", "data")} ${extract}` : when;
+    }
+
+    function status(change, kind) {
+        if (Math.round(change) === 0) return `<span class="dc-st dc-same">● ${esc(T("بدون تغيير", "No change"))}</span>`;
+        if (kind === "overdue") {
+            return change > 0
+                ? `<span class="dc-st dc-bad">▲ ${esc(T("زاد (أسوأ)", "Declined"))}</span>`
+                : `<span class="dc-st dc-good">▼ ${esc(T("قلّ (أحسن)", "Improved"))}</span>`;
+        }
+        return change > 0
+            ? `<span class="dc-st dc-up">▲ ${esc(T("زاد", "Up"))}</span>`
+            : `<span class="dc-st dc-down">▼ ${esc(T("قلّ", "Down"))}</span>`;
+    }
+
+    function build() {
+        const all = keys();
+        if (!all.includes(state.newKey)) state.newKey = all[all.length - 1] || "";
+        if (!all.includes(state.oldKey) || state.oldKey === state.newKey) state.oldKey = all.length > 1 ? all[all.length - 2] : "";
+        const map = new Map();
+        const add = (r, side) => {
+            if (state.branch && String(r.branch || "") !== state.branch) return;
+            const code = String(r.salesmanCode || "—");
+            const item = map.get(code) || { code, name: "", branch: "", old: { due: 0, overdue: 0 }, new: { due: 0, overdue: 0 } };
+            item.name = item.name || r.salesmanName || "";
+            item.branch = item.branch || r.branch || "";
+            item[side].due += Number(r.due) || 0;
+            item[side].overdue += Number(r.overdue) || 0;
+            map.set(code, item);
+        };
+        rows().forEach(r => {
+            if (r.snapshotAt === state.oldKey) add(r, "old");
+            if (r.snapshotAt === state.newKey) add(r, "new");
+        });
+        const list = [...map.values()];
+        const sortKey = state.metric === "due" ? "due" : "overdue";
+        list.sort((a, b) => b.new[sortKey] - a.new[sortKey] || b.old[sortKey] - a.old[sortKey]);
+        const total = { old: { due: 0, overdue: 0 }, new: { due: 0, overdue: 0 } };
+        list.forEach(i => ["old", "new"].forEach(s => ["due", "overdue"].forEach(k => { total[s][k] += i[s][k]; })));
+        return { list, total, all };
+    }
+
+    function metricCells(item, kind, withStatus) {
+        const o = item.old[kind];
+        const n = item.new[kind];
+        const c = n - o;
+        return `<td class="n">${money(o)}</td><td class="n">${money(n)}</td>
+            <td class="n ${c > 0.5 ? (kind === "overdue" ? "dc-bad-t" : "") : c < -0.5 ? (kind === "overdue" ? "dc-good-t" : "") : ""}">${signedMoney(c)}</td>
+            <td class="n">${pct(n, o)}</td>${withStatus ? `<td>${status(c, kind)}</td>` : ""}`;
+    }
+
+    function tableHTML(data) {
+        const kinds = state.metric === "both" ? ["overdue", "due"] : [state.metric];
+        const kindName = k => (k === "overdue" ? T("المتأخرات", "Overdue") : T("المستحقات", "Due"));
+        const sub = [T("قديم", "Old"), T("جديد", "New"), T("التغير", "Change"), T("التغير %", "Change %"), T("الحالة", "Status")];
+        const head1 = kinds.map(k => `<th colspan="5" class="dc-group dc-g-${k}">${esc(kindName(k))}</th>`).join("");
+        const head2 = kinds.map(() => sub.map((s, i) => `<th class="${i < 4 ? "n" : ""}">${esc(s)}</th>`).join("")).join("");
+        const body = data.list.map(i => `<tr>
+                <td>${esc(i.branch)}</td><td><strong>${esc(i.code)}</strong></td><td class="dc-name">${esc(i.name)}</td>
+                ${kinds.map(k => metricCells(i, k, true)).join("")}
+            </tr>`).join("");
+        const foot = `<tr class="dc-total"><td colspan="3">${esc(T("الإجمالي", "Total"))}</td>${kinds.map(k => metricCells(data.total, k, true)).join("")}</tr>`;
+        return `<table class="dc-table">
+            <thead><tr><th rowspan="2">${esc(T("الفرع", "Branch"))}</th><th rowspan="2">${esc(T("الكود", "Code"))}</th><th rowspan="2">${esc(T("المندوب", "Salesman"))}</th>${head1}</tr><tr>${head2}</tr></thead>
+            <tbody>${body || `<tr><td colspan="${3 + kinds.length * 5}">${esc(T("لا توجد بيانات", "No data"))}</td></tr>`}</tbody>
+            <tfoot>${foot}</tfoot>
+        </table>`;
+    }
+
+    function render() {
+        const root = utils.byId("dueCompareRoot");
+        if (!root) return;
+        const data = build();
+        const branches = [...new Set(rows().map(r => r.branch).filter(Boolean))].sort();
+
+        if (data.all.length < 2) {
+            const first = data.all[0];
+            root.innerHTML = `<p class="dc-empty">${esc(first
+                ? T(`أول لقطة للمديونية اتسجلت ${label(first)}. المقارنة هتظهر أول ما بيانات المديونية تتحدث وتتسجل لقطة جديدة.`, `The first due snapshot was saved ${label(first)}. The comparison appears after the due data changes and a new snapshot is saved.`)
+                : T("لسه مفيش لقطات للمديونية. أول لقطة بتتسجل مع أول تحميل للداشبورد بعد تحديث الكود.", "No due snapshots yet. The first one is saved on the next dashboard load."))}</p>`;
+            return;
+        }
+
+        const opt = (k, sel) => `<option value="${esc(k)}" ${k === sel ? "selected" : ""}>${esc(label(k))}</option>`;
+        const newest = [...data.all].reverse();
+        root.innerHTML = `
+            <div class="dc-controls">
+                <label><span>${esc(T("القديم", "Old"))}</span><select data-dc="old">${newest.map(k => opt(k, state.oldKey)).join("")}</select></label>
+                <label><span>${esc(T("الجديد", "New"))}</span><select data-dc="new">${newest.map(k => opt(k, state.newKey)).join("")}</select></label>
+                <label><span>${esc(T("الفرع", "Branch"))}</span><select data-dc="branch"><option value="">${esc(T("كل الفروع", "All branches"))}</option>${branches.map(b => `<option value="${esc(b)}" ${b === state.branch ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+                <label><span>${esc(T("المقارنة", "Compare"))}</span><select data-dc="metric">
+                    <option value="both" ${state.metric === "both" ? "selected" : ""}>${esc(T("المتأخرات والمستحقات", "Overdue & due"))}</option>
+                    <option value="overdue" ${state.metric === "overdue" ? "selected" : ""}>${esc(T("المتأخرات بس", "Overdue only"))}</option>
+                    <option value="due" ${state.metric === "due" ? "selected" : ""}>${esc(T("المستحقات بس", "Due only"))}</option>
+                </select></label>
+                <div class="dc-actions">
+                    <button type="button" class="secondary-button" data-dc-action="excel"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    <button type="button" class="secondary-button" data-dc-action="print"><i class="fa-solid fa-print"></i> ${esc(T("طباعة / PDF", "Print / PDF"))}</button>
+                </div>
+            </div>
+            <div class="table-wrapper dc-wrap">${tableHTML(data)}</div>
+            <p class="dc-note">${esc(T("المتأخرات: الزيادة ▲ أسوأ والنقص ▼ أحسن. المستحقات: الزيادة معناها مبيعات كرديت جديدة لسه مستحقتش. اللقطة بتتسجل تلقائي كل ما أرقام المديونية تتغير.", "Overdue: ▲ is worse, ▼ is better. Due: an increase means new credit sales not yet due. A snapshot is saved automatically whenever the due figures change."))}</p>`;
+    }
+
+    function exportExcel() {
+        if (!window.XLSX) return;
+        const data = build();
+        const kinds = state.metric === "both" ? ["overdue", "due"] : [state.metric];
+        const out = data.list.concat([{ ...data.total, code: "", name: T("الإجمالي", "Total"), branch: "" }]).map(i => {
+            const row = { Branch: i.branch, "Salesman code": i.code, Salesman: i.name };
+            kinds.forEach(k => {
+                const p = k === "overdue" ? "Overdue" : "Due";
+                row[`${p} old`] = Math.round(i.old[k]);
+                row[`${p} new`] = Math.round(i.new[k]);
+                row[`${p} change`] = Math.round(i.new[k] - i.old[k]);
+                row[`${p} change %`] = i.old[k] ? Math.round(((i.new[k] - i.old[k]) / Math.abs(i.old[k])) * 1000) / 10 : null;
+            });
+            return row;
+        });
+        const book = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(book, window.XLSX.utils.json_to_sheet(out), "Due comparison");
+        window.XLSX.writeFile(book, `Due_comparison_${state.oldKey.slice(0, 10)}_to_${state.newKey.slice(0, 10)}.xlsx`);
+    }
+
+    function printTable() {
+        const data = build();
+        const html = `<!doctype html><html lang="${ar() ? "ar" : "en"}" dir="${ar() ? "rtl" : "ltr"}"><head><meta charset="utf-8">
+            <title>${esc(T("مقارنة المديونية", "Due comparison"))}</title>
+            <style>
+                @page { size: A4 landscape; margin: 10mm; }
+                * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+                body { font-family: Cairo, "Segoe UI", Tahoma, Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; }
+                h1 { font-size: 16px; margin: 0 0 4px; color: #0f3d4f; text-align: center; }
+                .meta { text-align: center; color: #334155; margin-bottom: 8px; font-weight: 700; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #cbd5e1; padding: 4px 6px; white-space: nowrap; }
+                thead th { background: #1e3a5f; color: #fff; }
+                th.dc-group { background: #0f2b46; }
+                td.n, th.n { text-align: end; font-variant-numeric: tabular-nums; }
+                tfoot td { font-weight: 700; background: #e2e8f0; }
+                tbody tr:nth-child(even) td { background: #f8fafc; }
+                .dc-st { padding: 1px 6px; border-radius: 3px; font-weight: 700; }
+                .dc-bad { background: #fecaca; color: #991b1b; } .dc-good { background: #bbf7d0; color: #166534; }
+                .dc-up { color: #b45309; } .dc-down { color: #1d4ed8; } .dc-same { color: #475569; }
+            </style></head><body>
+            <h1>${esc(T("مقارنة المديونية لكل مندوب", "Salesman comparison — due & overdue"))}</h1>
+            <div class="meta">${esc(T("القديم", "Old"))}: ${esc(label(state.oldKey))} | ${esc(T("الجديد", "New"))}: ${esc(label(state.newKey))}${state.branch ? ` | ${esc(state.branch)}` : ""}</div>
+            ${tableHTML(data)}
+            </body></html>`;
+        const frame = document.createElement("iframe");
+        frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+        document.body.appendChild(frame);
+        frame.contentWindow.document.open();
+        frame.contentWindow.document.write(html);
+        frame.contentWindow.document.close();
+        setTimeout(() => {
+            try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (error) { /* ignore */ }
+            setTimeout(() => frame.remove(), 60000);
+        }, 300);
+    }
+
+    function bind() {
+        const root = utils.byId("dueCompareRoot");
+        if (!root || root.dataset.bound) return;
+        root.dataset.bound = "1";
+        root.addEventListener("change", event => {
+            const key = event.target.dataset.dc;
+            if (!key) return;
+            if (key === "old") state.oldKey = event.target.value;
+            if (key === "new") state.newKey = event.target.value;
+            if (key === "branch") state.branch = event.target.value;
+            if (key === "metric") state.metric = event.target.value;
+            render();
+        });
+        root.addEventListener("click", event => {
+            const action = event.target.closest("[data-dc-action]")?.dataset.dcAction;
+            if (action === "excel") exportExcel();
+            if (action === "print") printTable();
+        });
+    }
+
+    function update() {
+        bind();
+        render();
+    }
+
+    return Object.freeze({ update, render });
+})();
+
 window.DashboardApp = (() => {
     const config = window.DashboardConfig;
     const utils = window.DashboardUtils;
@@ -40038,6 +40297,8 @@ window.DashboardApp = (() => {
 
         window.DashboardCash = cashCollections;
         window.DashboardCashAll = state.rawData.cashCollections || [];
+        window.DashboardDueSnapshots = state.rawData.dueSnapshots || [];
+        try { window.DashboardDueCompare?.update(); } catch (error) { console.error(error); }
 
         const upcomingFilters = {
             ...filters,
@@ -40948,6 +41209,11 @@ window.DashboardApp = (() => {
                 cashCollections:
                     Array.isArray(response.cashCollections)
                         ? response.cashCollections
+                        : [],
+
+                dueSnapshots:
+                    Array.isArray(response.dueSnapshots)
+                        ? response.dueSnapshots
                         : [],
 
                 updatedAt:
