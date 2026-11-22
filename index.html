@@ -39344,9 +39344,13 @@ window.DashboardDueCompare = (() => {
     const keys = () => [...new Set(rows().map(r => r.snapshotAt))].sort();
 
     function label(key) {
+        const first = rows().find(r => r.snapshotAt === key) || {};
+        if (first.source === "oldSheet") {
+            return `${T("الشيت القديم", "Old sheet")} (${first.sheetName || ""})${first.extractDate ? `  •  ${T("بيانات", "data")} ${first.extractDate}` : ""}`;
+        }
         const m = String(key).match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
         const when = m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}` : key;
-        const extract = (rows().find(r => r.snapshotAt === key) || {}).extractDate;
+        const extract = first.extractDate;
         return extract ? `${when}  •  ${T("بيانات", "data")} ${extract}` : when;
     }
 
@@ -39365,7 +39369,11 @@ window.DashboardDueCompare = (() => {
     function build() {
         const all = keys();
         if (!all.includes(state.newKey)) state.newKey = all[all.length - 1] || "";
-        if (!all.includes(state.oldKey) || state.oldKey === state.newKey) state.oldKey = all.length > 1 ? all[all.length - 2] : "";
+        if (!all.includes(state.oldKey) || state.oldKey === state.newKey) {
+            // الافتراضي: الشيت القديم لو موجود، غير كده اللقطة اللي قبل الأخيرة
+            const oldSheet = rows().find(r => r.source === "oldSheet");
+            state.oldKey = oldSheet && oldSheet.snapshotAt !== state.newKey ? oldSheet.snapshotAt : all.length > 1 ? all[all.length - 2] : "";
+        }
         const map = new Map();
         const add = (r, side) => {
             if (state.branch && String(r.branch || "") !== state.branch) return;
