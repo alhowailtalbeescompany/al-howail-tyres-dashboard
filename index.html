@@ -7736,6 +7736,18 @@ body.dark-mode .ps-hero { background: #0a2536; border: 1px solid var(--border); 
                             <button
                                 class="report-card"
                                 type="button"
+                                data-report="dueMovement"
+                            >
+                                <i class="fa-solid fa-magnifying-glass-chart"></i>
+
+                                <span data-i18n="reports.dueMovementReport">
+                                    تقرير حركة المديونية والتحصيل
+                                </span>
+                            </button>
+
+                            <button
+                                class="report-card"
+                                type="button"
                                 data-report="history"
                             >
                                 <i class="fa-solid fa-chart-line"></i>
@@ -8641,6 +8653,7 @@ const TRANSLATIONS = {
             cashReport: "تقرير التحصيل الكاش",
             receivablesReport: "تقرير المستحقات والمتأخرات (مجمع)",
             historyReport: "تقرير المقارنات التاريخية (مجمع / فرع)",
+            dueMovementReport: "تقرير حركة المديونية والتحصيل",
             overdueReport: "تقرير المتأخرات",
             targetReport: "تقرير تحقيق الأهداف",
             salesmanReport: "تقرير المندوب",
@@ -9091,6 +9104,7 @@ const TRANSLATIONS = {
             cashReport: "Cash Collections Report",
             receivablesReport: "Due & Overdue Report (Consolidated)",
             historyReport: "Historical Comparison Report (Consolidated / Branch)",
+            dueMovementReport: "Due Movement & Collections Report",
             overdueReport: "Overdue Report",
             targetReport: "Target Achievement Report",
             salesmanReport: "Salesman Report",
@@ -19649,8 +19663,7 @@ window.DashboardTargets = (() => {
 
             const run = () => {
                 try {
-                    view.focus();
-                    view.print();
+                    window.__printFrame(view);
                 } catch (error) {
                     console.error(error);
                 }
@@ -30513,6 +30526,12 @@ window.DashboardReports = (() => {
             return true;
         }
 
+        /* تقرير حركة المديونية والتحصيل */
+        if (type === "dueMovement" && window.DashboardDueCompare) {
+            window.DashboardDueCompare.openReport();
+            return true;
+        }
+
         /* تقرير المقارنات التاريخية: مجمع / فرع / الكل */
         if (type === "history" && window.DashboardHistory) {
             window.DashboardHistory.openReport();
@@ -34093,8 +34112,7 @@ body.pz-present .pz-controls {
 
         const run = () => {
             try {
-                view.focus();
-                view.print();
+                window.__printFrame(view);
             } catch (error) {
                 console.error(error);
                 utils.showToast(tx("printFailed"), "error");
@@ -35251,8 +35269,7 @@ ${selected.length || !selection ? body : `<p class="empty">${esc(t.noData)}</p>`
 
         const run = () => {
             try {
-                view.focus();
-                view.print();
+                window.__printFrame(view);
             } catch (error) {
                 console.error(error);
             }
@@ -35970,7 +35987,7 @@ ${table(
         const view = frame?.contentWindow;
         if (!view) return;
         const run = () => {
-            try { view.focus(); view.print(); } catch (error) { console.error(error); }
+            try { window.__printFrame(view); } catch (error) { console.error(error); }
         };
         const ready = frame.contentDocument?.fonts?.ready;
         if (ready) ready.then(run).catch(run);
@@ -37645,7 +37662,7 @@ ${row(c, true)}
         const frame = utils.byId("monthlyReportFrame");
         const view = frame?.contentWindow;
         if (!view) return;
-        const run = () => { try { view.focus(); view.print(); } catch (error) { console.error(error); } };
+        const run = () => { try { window.__printFrame(view); } catch (error) { console.error(error); } };
         const ready = frame.contentDocument?.fonts?.ready;
         if (ready) ready.then(run).catch(run); else run();
     }
@@ -39001,7 +39018,7 @@ window.DashboardHistory = (() => {
         doc.write(html);
         doc.close();
         const run = () => {
-            try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (error) { window.print(); }
+            try { window.__printFrame(frame.contentWindow); } catch (error) { window.print(); }
         };
         const ready = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
         ready.then(() => setTimeout(run, 250)).catch(() => setTimeout(run, 250));
@@ -39099,7 +39116,7 @@ window.DashboardHistory = (() => {
             if (action === "print") {
                 const view = utils.byId("historyReportFrame")?.contentWindow;
                 if (!view) return;
-                const run = () => { try { view.focus(); view.print(); } catch (error) { printHTML(buildReportDocument(selected.ids)); } };
+                const run = () => { try { window.__printFrame(view); } catch (error) { printHTML(buildReportDocument(selected.ids)); } };
                 const ready = view.document?.fonts?.ready;
                 if (ready) ready.then(run).catch(run); else run();
             }
@@ -39451,6 +39468,7 @@ window.DashboardDueCompare = (() => {
                     <option value="due" ${state.metric === "due" ? "selected" : ""}>${esc(T("المستحقات بس", "Due only"))}</option>
                 </select></label>
                 <div class="dc-actions">
+                    <button type="button" class="primary-button" data-dc-action="report"><i class="fa-solid fa-magnifying-glass-chart"></i> ${esc(T("تقرير الحركة والتحصيل", "Movement & collections report"))}</button>
                     <button type="button" class="secondary-button" data-dc-action="excel"><i class="fa-solid fa-file-excel"></i> Excel</button>
                     <button type="button" class="secondary-button" data-dc-action="print"><i class="fa-solid fa-print"></i> ${esc(T("طباعة / PDF", "Print / PDF"))}</button>
                 </div>
@@ -39482,7 +39500,7 @@ window.DashboardDueCompare = (() => {
     function printTable() {
         const data = build();
         const html = `<!doctype html><html lang="${ar() ? "ar" : "en"}" dir="${ar() ? "rtl" : "ltr"}"><head><meta charset="utf-8">
-            <title>${esc(T("مقارنة المديونية", "Due comparison"))}</title>
+            <title>${esc(`${T("مقارنة المديونية", "Due comparison")} ${state.oldKey.slice(0, 10)} - ${state.newKey.slice(0, 10)}`)}</title>
             <style>
                 @page { size: A4 landscape; margin: 10mm; }
                 * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
@@ -39511,9 +39529,315 @@ window.DashboardDueCompare = (() => {
         frame.contentWindow.document.write(html);
         frame.contentWindow.document.close();
         setTimeout(() => {
-            try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (error) { /* ignore */ }
+            try { window.__printFrame ? window.__printFrame(frame.contentWindow) : frame.contentWindow.print(); } catch (error) { /* ignore */ }
             setTimeout(() => frame.remove(), 60000);
         }, 300);
+    }
+
+
+    /* =====================================================
+       تقرير حركة المديونية والتحصيل
+       بيقارن تغير المتأخرات والمستحقات بتحصيلات المندوب
+       ومبيعاته الكرديت في نفس الفترة
+    ===================================================== */
+    const rep = { from: "", to: "" };
+
+    function snapshotDate(key) {
+        const first = rows().find(r => r.snapshotAt === key) || {};
+        return String(first.extractDate || key || "").slice(0, 10);
+    }
+
+    function dayList(from, to) {
+        const out = [];
+        if (!from || !to || from > to) return out;
+        const d = new Date(from + "T00:00:00");
+        const end = new Date(to + "T00:00:00");
+        while (d <= end && out.length < 400) {
+            out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+            d.setDate(d.getDate() + 1);
+        }
+        return out;
+    }
+
+    function buildMovement() {
+        const base = build();
+        const raw = window.DashboardDueRaw || {};
+        const from = rep.from;
+        const to = rep.to;
+        const inRange = d => {
+            const t = String(d || "").slice(0, 10);
+            return t && t >= from && t <= to;
+        };
+        const days = dayList(from, to);
+        const coll = new Map();
+        (raw.collections || []).forEach(r => {
+            if (!inRange(r.collectionDate)) return;
+            const code = String(r.salesmanCode || "—");
+            const item = coll.get(code) || { total: 0, byDay: {}, customers: new Set() };
+            const amount = Number(r.collectionAmount) || 0;
+            item.total += amount;
+            const day = String(r.collectionDate).slice(0, 10);
+            item.byDay[day] = (item.byDay[day] || 0) + amount;
+            if (r.customerCode) item.customers.add(String(r.customerCode));
+            coll.set(code, item);
+        });
+        const credit = new Map();
+        (raw.invoices || []).forEach(r => {
+            if (!inRange(r.invoiceDate)) return;
+            if (/cash|نقد|كاش/i.test(String(r.invoiceType || ""))) return;
+            const code = String(r.salesmanCode || "—");
+            const amount = (Number(r.salesWithoutTax) || 0) + (Number(r.vatAmount) || 0);
+            credit.set(code, (credit.get(code) || 0) + amount);
+        });
+
+        const list = base.list.map(i => {
+            const c = coll.get(i.code) || { total: 0, byDay: {}, customers: new Set() };
+            const sales = credit.get(i.code) || 0;
+            const dOver = i.new.overdue - i.old.overdue;
+            const dDue = i.new.due - i.old.due;
+            const daysWith = days.filter(d => (c.byDay[d] || 0) > 0).length;
+            const notes = [];
+            let level = "ok";
+            const m = v => money(v);
+            if (dOver > 0.5 && c.total <= 0) {
+                notes.push({ t: "bad", x: T(`لم يحصّل خلال الفترة، والمتأخرات زادت ${m(dOver)}`, `No collections in the period; overdue rose ${m(dOver)}`) });
+                level = "bad";
+            } else if (dOver > 0.5) {
+                notes.push({ t: "warn", x: T(`حصّل ${m(c.total)} بس المتأخرات زادت ${m(dOver)} (فواتير جديدة دخلت التأخير)`, `Collected ${m(c.total)} but overdue rose ${m(dOver)} (new invoices became overdue)`) });
+                level = "warn";
+            } else if (dOver < -0.5 && c.total > 0) {
+                notes.push({ t: "good", x: T(`التحصيل (${m(c.total)}) نزّل المتأخرات ${m(-dOver)}`, `Collections (${m(c.total)}) cut overdue by ${m(-dOver)}`) });
+                level = "good";
+            } else if (dOver < -0.5) {
+                notes.push({ t: "info", x: T(`المتأخرات قلّت ${m(-dOver)} من غير تحصيل مسجل في الفترة (مرتجع أو تسوية)`, `Overdue fell ${m(-dOver)} with no recorded collections (return or settlement)`) });
+            } else if (i.new.overdue > 0.5 && c.total <= 0) {
+                notes.push({ t: "bad", x: T("لم يحصّل خلال الفترة، والمتأخرات زي ما هي", "No collections in the period; overdue unchanged") });
+                level = "bad";
+            } else if (c.total > 0) {
+                notes.push({ t: "info", x: T(`حصّل ${m(c.total)} في الفترة`, `Collected ${m(c.total)} in the period`) });
+            }
+            if (dDue > 0.5 && sales > 0) {
+                notes.push({ t: "info", x: T(`باع كرديت بـ ${m(sales)}، فالمستحقات زادت ${m(dDue)}`, `Credit sales of ${m(sales)}, so due rose ${m(dDue)}`) });
+            } else if (dDue > 0.5) {
+                notes.push({ t: "info", x: T(`المستحقات زادت ${m(dDue)}`, `Due rose ${m(dDue)}`) });
+            } else if (dDue < -0.5) {
+                notes.push({ t: "info", x: T(`المستحقات قلّت ${m(-dDue)} (اتحصلت أو دخلت التأخير)`, `Due fell ${m(-dDue)} (collected or became overdue)`) });
+            } else if (sales > 0) {
+                notes.push({ t: "info", x: T(`باع كرديت بـ ${m(sales)}`, `Credit sales ${m(sales)}`) });
+            }
+            return { ...i, dOver, dDue, collections: c.total, byDay: c.byDay, daysWith, customers: c.customers.size, sales, notes, level };
+        });
+        const rank = { bad: 0, warn: 1, info: 2, ok: 2, good: 3 };
+        list.sort((a, b) => rank[a.level] - rank[b.level] || b.dOver - a.dOver);
+        const sum = k => list.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+        return {
+            list,
+            days,
+            totals: {
+                dOver: sum("dOver"),
+                dDue: sum("dDue"),
+                collections: sum("collections"),
+                sales: sum("sales"),
+                noCollect: list.filter(r => r.level === "bad").length
+            },
+            total: base.total
+        };
+    }
+
+    function reportDocument() {
+        const data = buildMovement();
+        const isAr = ar();
+        const dayName = d => new Intl.DateTimeFormat(isAr ? "ar-EG" : "en-GB", { weekday: "short" }).format(new Date(d + "T00:00:00"));
+        const dayLabel = d => `${dayName(d)} ${d.slice(8, 10)}/${d.slice(5, 7)}`;
+        const showDays = data.days.length > 0 && data.days.length <= 10;
+        const title = `${T("تقرير حركة المديونية والتحصيل", "Due movement & collections report")} ${rep.from} - ${rep.to}`;
+        const cls = v => (v > 0.5 ? "bad" : v < -0.5 ? "good" : "");
+        const sm = v => (Math.round(v) === 0 ? "-" : `${v > 0 ? "+" : "−"}${money(v)}`);
+        const nm = v => Math.round(Math.abs(Number(v) || 0)).toLocaleString("en-US");
+        const smn = v => (Math.round(v) === 0 ? "-" : `${v > 0 ? "+" : "−"}${nm(v)}`);
+        const kpi = (label, value, extra = "") => `<div class="k ${extra}"><span>${esc(label)}</span><strong>${value}</strong></div>`;
+
+        const rowsHTML = data.list.map(r => `<tr class="lv-${r.level}">
+            <td>${esc(r.branch)}</td><td><b>${esc(r.code)}</b></td><td class="nm">${esc(r.name)}</td>
+            <td class="n">${nm(r.old.overdue)}</td><td class="n">${nm(r.new.overdue)}</td><td class="n ${cls(r.dOver)}">${smn(r.dOver)}</td>
+            <td class="n">${nm(r.old.due)}</td><td class="n">${nm(r.new.due)}</td><td class="n">${smn(r.dDue)}</td>
+            <td class="n ${r.collections > 0 ? "good" : "bad"}">${r.collections > 0 ? nm(r.collections) : esc(T("لا يوجد", "None"))}</td>
+            <td class="n">${r.daysWith} / ${data.days.length}</td>
+            <td class="n">${r.sales > 0 ? nm(r.sales) : "-"}</td>
+            <td class="ex">${r.notes.map(nn => `<div class="t-${nn.t}">${esc(nn.x)}</div>`).join("")}</td>
+        </tr>`).join("");
+
+        const dailyHTML = showDays ? `
+            <h2>${esc(T("التحصيل يوم بيوم", "Collections day by day"))}</h2>
+            <table class="daily">
+                <thead><tr><th>${esc(T("الكود", "Code"))}</th><th>${esc(T("المندوب", "Salesman"))}</th>${data.days.map(d => `<th class="n">${esc(dayLabel(d))}</th>`).join("")}<th class="n">${esc(T("الإجمالي", "Total"))}</th></tr></thead>
+                <tbody>${data.list.map(r => `<tr><td><b>${esc(r.code)}</b></td><td class="nm">${esc(r.name)}</td>${data.days.map(d => {
+                    const v = r.byDay[d] || 0;
+                    return `<td class="n ${v > 0 ? "has" : "none"}">${v > 0 ? nm(v) : "—"}</td>`;
+                }).join("")}<td class="n"><b>${r.collections > 0 ? nm(r.collections) : "—"}</b></td></tr>`).join("")}</tbody>
+            </table>` : "";
+
+        return `<!doctype html><html lang="${isAr ? "ar" : "en"}" dir="${isAr ? "rtl" : "ltr"}"><head><meta charset="utf-8">
+<title>${esc(title)}</title>
+<style>
+    @page { size: A4 landscape; margin: 9mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: Cairo, "Segoe UI", Tahoma, Arial, sans-serif; color: #0f172a; font-size: 9.5px; margin: 0; background: #fff; }
+    @media screen { body { background: #e2e8f0; padding: 14px; } .page { background: #fff; max-width: 1200px; margin: 0 auto; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.12); } }
+    header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; border-bottom: 2px solid #176b87; padding-bottom: 6px; margin-bottom: 10px; }
+    h1 { margin: 0; font-size: 17px; color: #0f3d4f; }
+    h2 { font-size: 13px; color: #0f3d4f; margin: 14px 0 6px; break-after: avoid; }
+    .meta { color: #475569; font-size: 10px; line-height: 1.6; text-align: end; }
+    .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
+    .k { border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; display: grid; gap: 2px; }
+    .k span { color: #64748b; font-size: 9.5px; } .k strong { font-size: 14px; }
+    .k.bad strong { color: #b91c1c; } .k.good strong { color: #15803d; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 3px 4px; text-align: start; white-space: nowrap; vertical-align: top; }
+    th { white-space: normal; }
+    th { background: #f1f5f9; color: #334155; font-weight: 700; }
+    th.grp { text-align: center; background: #e6f1f5; }
+    td.n, th.n { text-align: end; font-variant-numeric: tabular-nums; }
+    td.nm { white-space: normal; min-width: 80px; max-width: 120px; }
+    td.ex { white-space: normal; width: 30%; min-width: 180px; font-size: 9.5px; line-height: 1.45; }
+    .bad { color: #b91c1c; font-weight: 700; } .good { color: #15803d; font-weight: 700; }
+    .t-bad { color: #b91c1c; font-weight: 700; } .t-warn { color: #b45309; font-weight: 700; } .t-good { color: #15803d; font-weight: 700; } .t-info { color: #334155; }
+    tr.lv-bad td:first-child { border-inline-start: 4px solid #dc2626; }
+    tr.lv-warn td:first-child { border-inline-start: 4px solid #f59e0b; }
+    tr.lv-good td:first-child { border-inline-start: 4px solid #16a34a; }
+    tfoot td { font-weight: 800; background: #f1f5f9; border-top: 2px solid #94a3b8; }
+    .daily td.none { background: #fef2f2; color: #b91c1c; text-align: center; }
+    .daily td.has { background: #f0fdf4; }
+    .note { color: #64748b; font-size: 9.5px; margin-top: 8px; line-height: 1.6; }
+</style></head><body><div class="page">
+    <header>
+        <div><h1>${esc(T("تقرير حركة المديونية والتحصيل", "Due movement & collections report"))}</h1>
+        <div style="color:#176b87;font-weight:700">${esc(state.branch || T("كل الفروع", "All branches"))}</div></div>
+        <div class="meta">
+            <div>${esc(T("القديم", "Old"))}: ${esc(label(state.oldKey))}</div>
+            <div>${esc(T("الجديد", "New"))}: ${esc(label(state.newKey))}</div>
+            <div>${esc(T("المبالغ بالريال", "Amounts in SAR"))}</div>
+            <div>${esc(T("فترة التحصيل والمبيعات", "Collections & sales period"))}: ${esc(rep.from)} → ${esc(rep.to)} (${data.days.length} ${esc(T("يوم", "days"))})</div>
+        </div>
+    </header>
+    <div class="kpis">
+        ${kpi(T("تغير المتأخرات", "Overdue change"), sm(data.totals.dOver), cls(data.totals.dOver))}
+        ${kpi(T("تغير المستحقات", "Due change"), sm(data.totals.dDue))}
+        ${kpi(T("التحصيل في الفترة", "Collections in period"), money(data.totals.collections), "good")}
+        ${kpi(T("مبيعات كرديت في الفترة (شامل الضريبة)", "Credit sales in period (incl. VAT)"), money(data.totals.sales))}
+        ${kpi(T("مناديب محصلوش ومتأخراتهم موجودة/زادت", "Salesmen with no collections"), String(data.totals.noCollect), data.totals.noCollect ? "bad" : "")}
+    </div>
+    <table>
+        <thead>
+            <tr><th rowspan="2">${esc(T("الفرع", "Branch"))}</th><th rowspan="2">${esc(T("الكود", "Code"))}</th><th rowspan="2">${esc(T("المندوب", "Salesman"))}</th>
+                <th colspan="3" class="grp">${esc(T("المتأخرات", "Overdue"))}</th><th colspan="3" class="grp">${esc(T("المستحقات", "Due"))}</th>
+                <th colspan="3" class="grp">${esc(T("خلال الفترة", "During the period"))}</th><th rowspan="2">${esc(T("التفسير", "Explanation"))}</th></tr>
+            <tr><th class="n">${esc(T("قديم", "Old"))}</th><th class="n">${esc(T("جديد", "New"))}</th><th class="n">${esc(T("التغير", "Change"))}</th>
+                <th class="n">${esc(T("قديم", "Old"))}</th><th class="n">${esc(T("جديد", "New"))}</th><th class="n">${esc(T("التغير", "Change"))}</th>
+                <th class="n">${esc(T("التحصيل", "Collected"))}</th><th class="n">${esc(T("أيام فيها تحصيل", "Days collected"))}</th><th class="n">${esc(T("بيع كرديت", "Credit sales"))}</th></tr>
+        </thead>
+        <tbody>${rowsHTML || `<tr><td colspan="13">${esc(T("لا توجد بيانات", "No data"))}</td></tr>`}</tbody>
+        <tfoot><tr><td colspan="3">${esc(T("الإجمالي", "Total"))}</td>
+            <td class="n">${nm(data.total.old.overdue)}</td><td class="n">${nm(data.total.new.overdue)}</td><td class="n ${cls(data.totals.dOver)}">${smn(data.totals.dOver)}</td>
+            <td class="n">${nm(data.total.old.due)}</td><td class="n">${nm(data.total.new.due)}</td><td class="n">${smn(data.totals.dDue)}</td>
+            <td class="n">${nm(data.totals.collections)}</td><td></td><td class="n">${nm(data.totals.sales)}</td><td></td></tr></tfoot>
+    </table>
+    ${dailyHTML}
+    <p class="note">${esc(T("التحصيل = المبالغ المسددة على فواتير الكرديت من شيت التحصيلات في الفترة. بيع كرديت = فواتير الكرديت في الفترة شامل الضريبة. التحصيل الكاش الشهري مش داخل لأنه مش متسجل يوم بيوم.", "Collections = amounts applied to credit invoices in the period (collections sheet). Credit sales = credit invoices in the period incl. VAT. Monthly cash collections are not included (no daily dates)."))}</p>
+</div></body></html>`;
+    }
+
+    function closeReport() {
+        utils.byId("dueMovementModal")?.remove();
+    }
+
+    function openReport() {
+        bind();
+        const all = keys();
+        if (all.length < 2) {
+            utils.showToast?.(T("محتاج لقطتين للمديونية على الأقل", "At least two due snapshots are needed"), "warning");
+            return;
+        }
+        build();
+        if (!rep.from) rep.from = snapshotDate(state.oldKey);
+        if (!rep.to) rep.to = snapshotDate(state.newKey);
+        closeReport();
+        const newest = [...all].reverse();
+        const opt = (k, sel) => `<option value="${esc(k)}" ${k === sel ? "selected" : ""}>${esc(label(k))}</option>`;
+        const branches = [...new Set(rows().map(r => r.branch).filter(Boolean))].sort();
+        const modal = document.createElement("div");
+        modal.id = "dueMovementModal";
+        modal.className = "report-preview-overlay";
+        modal.innerHTML = `
+            <section class="report-preview-card branch-report-card">
+                <header class="report-preview-header">
+                    <div>
+                        <h2>${esc(T("تقرير حركة المديونية والتحصيل", "Due movement & collections report"))}</h2>
+                        <p>${esc(T("تغير المتأخرات والمستحقات لكل مندوب، ومقارنته بتحصيلاته ومبيعاته الكرديت في نفس الفترة", "Overdue and due change per salesman against his collections and credit sales in the same period"))}</p>
+                    </div>
+                    <button type="button" class="icon-button" data-dm="close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+                </header>
+                <div class="report-preview-actions branch-report-actions dm-controls">
+                    <label class="branch-report-select"><span>${esc(T("القديم", "Old"))}</span><select data-dm-f="old">${newest.map(k => opt(k, state.oldKey)).join("")}</select></label>
+                    <label class="branch-report-select"><span>${esc(T("الجديد", "New"))}</span><select data-dm-f="new">${newest.map(k => opt(k, state.newKey)).join("")}</select></label>
+                    <label class="branch-report-select"><span>${esc(T("التحصيل من", "Collections from"))}</span><input type="date" data-dm-f="from" value="${esc(rep.from)}"></label>
+                    <label class="branch-report-select"><span>${esc(T("إلى", "To"))}</span><input type="date" data-dm-f="to" value="${esc(rep.to)}"></label>
+                    <label class="branch-report-select"><span>${esc(T("الفرع", "Branch"))}</span><select data-dm-f="branch"><option value="">${esc(T("كل الفروع", "All branches"))}</option>${branches.map(b => `<option value="${esc(b)}" ${b === state.branch ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+                    <span style="flex:1"></span>
+                    <button class="secondary-button" type="button" data-dm="excel"><i class="fa-solid fa-file-excel"></i><span>Excel</span></button>
+                    <button class="primary-button" type="button" data-dm="print"><i class="fa-solid fa-print"></i><span>${esc(T("طباعة / PDF", "Print / PDF"))}</span></button>
+                </div>
+                <iframe id="dueMovementFrame" class="branch-report-frame" title="report"></iframe>
+            </section>`;
+        document.body.appendChild(modal);
+        const refresh = () => {
+            const frame = utils.byId("dueMovementFrame");
+            if (frame) frame.srcdoc = reportDocument();
+        };
+        modal.addEventListener("change", event => {
+            const f = event.target.dataset.dmF;
+            if (!f) return;
+            if (f === "old") { state.oldKey = event.target.value; rep.from = snapshotDate(state.oldKey); modal.querySelector("[data-dm-f=from]").value = rep.from; }
+            if (f === "new") { state.newKey = event.target.value; rep.to = snapshotDate(state.newKey); modal.querySelector("[data-dm-f=to]").value = rep.to; }
+            if (f === "from") rep.from = event.target.value;
+            if (f === "to") rep.to = event.target.value;
+            if (f === "branch") state.branch = event.target.value;
+            refresh();
+            render();
+        });
+        modal.addEventListener("click", event => {
+            if (event.target === modal) { closeReport(); return; }
+            const action = event.target.closest("[data-dm]")?.dataset.dm;
+            if (action === "close") closeReport();
+            if (action === "print") {
+                const view = utils.byId("dueMovementFrame")?.contentWindow;
+                if (view) { try { window.__printFrame ? window.__printFrame(view) : window.__printFrame(view); } catch (error) { console.error(error); } }
+            }
+            if (action === "excel") exportMovement();
+        });
+        refresh();
+    }
+
+    function exportMovement() {
+        if (!window.XLSX) return;
+        const data = buildMovement();
+        const out = data.list.map(r => {
+            const row = {
+                Branch: r.branch, "Salesman code": r.code, Salesman: r.name,
+                "Overdue old": Math.round(r.old.overdue), "Overdue new": Math.round(r.new.overdue), "Overdue change": Math.round(r.dOver),
+                "Due old": Math.round(r.old.due), "Due new": Math.round(r.new.due), "Due change": Math.round(r.dDue),
+                "Collections in period": Math.round(r.collections), "Days with collections": `${r.daysWith}/${data.days.length}`,
+                "Credit sales in period (incl VAT)": Math.round(r.sales),
+                Explanation: r.notes.map(n => n.x).join(" | ")
+            };
+            if (data.days.length <= 10) data.days.forEach(d => { row[d] = Math.round(r.byDay[d] || 0); });
+            return row;
+        });
+        const book = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(book, window.XLSX.utils.json_to_sheet(out), "Due movement");
+        window.XLSX.writeFile(book, `Due_movement_${rep.from}_to_${rep.to}.xlsx`);
     }
 
     function bind() {
@@ -39533,6 +39857,7 @@ window.DashboardDueCompare = (() => {
             const action = event.target.closest("[data-dc-action]")?.dataset.dcAction;
             if (action === "excel") exportExcel();
             if (action === "print") printTable();
+            if (action === "report") openReport();
         });
     }
 
@@ -39541,8 +39866,33 @@ window.DashboardDueCompare = (() => {
         render();
     }
 
-    return Object.freeze({ update, render });
+    return Object.freeze({ update, render, openReport });
 })();
+
+
+/* =========================================================
+   طباعة تقرير من iframe باسم التقرير نفسه
+   (المتصفح بيسمي ملف الـ PDF باسم الصفحة الرئيسية، فبنغيره مؤقتًا)
+========================================================= */
+window.__printFrame = function (win) {
+    const original = document.title;
+    let title = "";
+    try { title = String((win && win.document && win.document.title) || "").trim(); } catch (error) { title = ""; }
+    if (title) {
+        const now = new Date();
+        const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        if (!/\d{4}-\d{2}-\d{2}/.test(title)) title = `${title} ${stamp}`;
+        document.title = title;
+        try { win.document.title = title; } catch (error) { /* ignore */ }
+    }
+    const restore = () => { document.title = original; };
+    try {
+        win.focus();
+        win.print();
+    } finally {
+        setTimeout(restore, 1500);
+    }
+};
 
 window.DashboardApp = (() => {
     const config = window.DashboardConfig;
@@ -40306,6 +40656,7 @@ window.DashboardApp = (() => {
         window.DashboardCash = cashCollections;
         window.DashboardCashAll = state.rawData.cashCollections || [];
         window.DashboardDueSnapshots = state.rawData.dueSnapshots || [];
+        window.DashboardDueRaw = { collections: state.rawData.collections || [], invoices: state.rawData.invoices || [] };
         try { window.DashboardDueCompare?.update(); } catch (error) { console.error(error); }
 
         const upcomingFilters = {
