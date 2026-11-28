@@ -37115,6 +37115,8 @@ window.DashboardMonthlyReport = (() => {
                 name: clean(row.salesmanName) || clean(row.salesmanCode),
                 branch: clean(row.branch) || t.unassigned,
                 target,
+                /* مندوب قطع: هدفه وتحقيقه بعدد القطع */
+                pcs: window.PcsTargets?.evaluate?.(row, start, end) || null,
                 sales: 0,
                 overdue: 0,
                 overdue90: 0,
@@ -37237,7 +37239,7 @@ window.DashboardMonthlyReport = (() => {
 
         const gapDrivers = (isCompany, scopeName) => {
             const list = [...salesmen.values()]
-                .filter(s => (isCompany || s.branch === scopeName) && s.target > 0)
+                .filter(s => (isCompany || s.branch === scopeName) && s.target > 0 && !/^TGT-/i.test(s.code))
                 .map(s => {
                     const p = project(s.sales, s.target);
                     const top = [...s.overdueCustomers.values()].sort((x, y) => y.amount - x.amount)[0] || null;
@@ -37276,8 +37278,8 @@ window.DashboardMonthlyReport = (() => {
                 .sort((a, b) => b.sales - a.sales),
             gapDrivers: gapDrivers(isCompany, scope.name),
             salesmen: [...salesmen.values()]
-                .filter(s => (isCompany || s.branch === scope.name) && s.target > 0)
-                .map(s => ({ ...s, ...project(s.target > 0 ? s.sales : 0, s.target) }))
+                .filter(s => (isCompany || s.branch === scope.name) && (s.target > 0 || s.pcs))
+                .map(s => ({ ...s, ...(s.pcs ? project(s.pcs.sold, s.pcs.target) : project(s.target > 0 ? s.sales : 0, s.target)) }))
                 .sort((a, b) => (b.achievedPct ?? -1) - (a.achievedPct ?? -1))
         });
 
@@ -37380,8 +37382,8 @@ window.DashboardMonthlyReport = (() => {
             scope.salesmen.map(s => `<tr>
                 <td class="strong">${esc(s.name)}</td>
                 ${isConsolidated ? `<td>${esc(s.branch)}</td>` : ""}
-                <td class="n">${money(s.sales)}</td>
-                <td class="n">${s.target > 0 ? money(s.target) : `<span class="muted">${esc(t.noTarget)}</span>`}</td>
+                <td class="n">${money(s.sales)}${s.pcs ? `<small>${money(s.pcs.sold)} ${lang() === "ar" ? "قطعة" : "pcs"}</small>` : ""}</td>
+                <td class="n">${s.pcs ? `${money(s.pcs.target)} ${lang() === "ar" ? "قطعة" : "pcs"}` : s.target > 0 ? money(s.target) : `<span class="muted">${esc(t.noTarget)}</span>`}</td>
                 <td class="n ${tone(s.achievedPct)}">${pct(s.achievedPct)}</td>
                 ${closed ? "" : `<td class="n ${tone(s.forecastPct)}">${pct(s.forecastPct)}</td>`}
                 <td class="n">${money(s.overdue)}</td></tr>`));
@@ -37697,6 +37699,8 @@ ${row(c, true)}
             [t.branch]: s.branch,
             [t.sales]: Math.round(s.sales),
             [t.target]: Math.round(s.target),
+            ["PCS target"]: s.pcs ? s.pcs.target : "",
+            ["PCS sold"]: s.pcs ? s.pcs.sold : "",
             [t.achieved]: s.achievedPct == null ? "" : +s.achievedPct.toFixed(1),
             ...(data.closed ? {} : { [t.forecastPct]: s.forecastPct == null ? "" : +s.forecastPct.toFixed(1) }),
             [t.overdue]: Math.round(s.overdue)
