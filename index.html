@@ -13151,6 +13151,7 @@ window.DashboardDashboard = (() => {
             window.DashboardTargets?.hasTargetForCode
                 ? utils.sumBy(
                       invoices.filter(row =>
+                          window.PcsTargets?.isBranchCountedRow?.(row) ||
                           window.DashboardTargets.hasTargetForCode(
                               utils.firstValue(row, ["salesmanCode", "Salesman Code"], "")
                           )
@@ -18552,6 +18553,11 @@ window.DashboardTargets = (() => {
      * حساب نسبة تحقيق الهدف للفرع أو للشركة.
      */
     function hasTargetForCode(code) {
+        /* مناديب القطع: هدفهم قطع، بس فلوسهم بتدخل في تحقيق الفرع */
+        if (window.PcsTargets?.isPcs?.(code) || window.PcsTargets?.isBranchCounted?.(code)) {
+            return true;
+        }
+
         const wanted = getSalesmanCodes(code);
 
         if (!wanted.length) {
@@ -18828,6 +18834,9 @@ window.DashboardTargets = (() => {
 
     function normalizeInvoiceRow(row = {}) {
         return {
+            originalSalesmanCode:
+                normalizeCode(row.originalSalesmanCode || ""),
+
             salesmanCode:
                 normalizeCode(
                     firstValue(
@@ -19010,6 +19019,36 @@ window.DashboardTargets = (() => {
     ===================================================== */
 
     function buildPerformanceRows() {
+        const rows = buildPerformanceRowsBase();
+
+        if (!window.PcsTargets) {
+            return rows;
+        }
+
+        const period = periodRange
+            ? { from: periodRange.from, to: periodRange.to }
+            : window.PcsTargets.currentPeriod();
+
+        const countedByCode = new Map();
+        getInvoices().forEach(invoice => {
+            if (!window.PcsTargets.isBranchCounted(invoice.originalSalesmanCode) || !isInPeriod(invoice.invoiceDate)) return;
+            countedByCode.set(invoice.salesmanCode, (countedByCode.get(invoice.salesmanCode) || 0) + invoice.salesWithoutTax);
+        });
+
+        return rows
+            .map(row => {
+                const next = window.PcsTargets.apply(row, period.from, period.to);
+                /* مبيعات بتدخل في تحقيق الفرع: مندوب له هدف أو مندوب قطع،
+                   وإلا الأكواد المتعلّمة إنها بتدخل الفرع بس (زي أسعار المجدوعي الخاصة) */
+                next.branchSales = toNumber(next.monthlyTarget) > 0 || next.unit === "PCS"
+                    ? toNumber(next.sales)
+                    : (countedByCode.get(next.salesmanCode) || 0);
+                return next;
+            })
+            .sort((first, second) => second.achievement - first.achievement);
+    }
+
+    function buildPerformanceRowsBase() {
         const quarter =
             getQuarter(referenceDate);
 
@@ -19282,9 +19321,11 @@ window.DashboardTargets = (() => {
 
                 <td>
                     ${escapeHTML(
-                        formatCurrency(
-                            row.monthlyTarget
-                        )
+                        row.unit === "PCS"
+                            ? window.PcsTargets.pieces(row.pcsTarget)
+                            : formatCurrency(
+                                row.monthlyTarget
+                            )
                     )}
                 </td>
 
@@ -19294,6 +19335,7 @@ window.DashboardTargets = (() => {
                             row.sales
                         )
                     )}
+                    ${row.unit === "PCS" ? `<br><small>${escapeHTML(window.PcsTargets.pieces(row.pcsSold))}</small>` : ""}
                 </td>
 
                 <td>
@@ -19315,9 +19357,11 @@ window.DashboardTargets = (() => {
 
                 <td>
                     ${escapeHTML(
-                        formatCurrency(
-                            row.remaining
-                        )
+                        row.unit === "PCS"
+                            ? window.PcsTargets.pieces(row.remaining)
+                            : formatCurrency(
+                                row.remaining
+                            )
                     )}
                 </td>
 
@@ -19532,7 +19576,13 @@ window.DashboardTargets = (() => {
                     "common.status",
                     "الحالة"
                 )]:
-                    getStatus(row).text
+                    getStatus(row).text,
+
+                ["هدف القطع (PCS)"]:
+                    row.unit === "PCS" ? row.pcsTarget : "",
+
+                ["القطع المباعة (PCS)"]:
+                    row.unit === "PCS" ? row.pcsSold : ""
             })
         );
     }
@@ -19791,7 +19841,7 @@ window.DashboardTargets = (() => {
         const searchValue = String(byId("targetsSearchInput")?.value || "").trim();
 
         const tone = row => {
-            if (!(toNumber(row.monthlyTarget) > 0)) return "is-none";
+            if (!(toNumber(row.monthlyTarget) > 0) && row.unit !== "PCS") return "is-none";
             if (row.achievement >= 100) return "is-good";
             if (row.achievement >= 80) return "is-warn";
             return "is-bad";
@@ -19809,11 +19859,11 @@ window.DashboardTargets = (() => {
 
         const totalTarget = rows.reduce((sum, row) => sum + toNumber(row.monthlyTarget), 0);
         /* المبيعات بدون هدف (GM ومكاتب العملاء) لا تدخل في الإجمالي ونسبة التحقيق */
+        /* المبيعات اللي بتدخل في التحقيق: أصحاب الهدف + مناديب القطع + الأكواد المتعلّمة للفرع */
         const totalSales = rows
-            .filter(row => toNumber(row.monthlyTarget) > 0)
-            .reduce((sum, row) => sum + toNumber(row.sales), 0);
+            .reduce((sum, row) => sum + toNumber(row.branchSales ?? (toNumber(row.monthlyTarget) > 0 ? row.sales : 0)), 0);
         const totalAchievement = totalTarget > 0 ? (totalSales / totalTarget) * 100 : 0;
-        const withTarget = rows.filter(row => toNumber(row.monthlyTarget) > 0);
+        const withTarget = rows.filter(row => toNumber(row.monthlyTarget) > 0 || row.unit === "PCS");
         const achievedRows = withTarget.filter(row => row.achieved);
 
         const totalsTone = totalTarget > 0
@@ -19828,8 +19878,8 @@ window.DashboardTargets = (() => {
 
             entry.target += toNumber(row.monthlyTarget);
 
-            if (toNumber(row.monthlyTarget) > 0) {
-                entry.sales += toNumber(row.sales);
+            if (toNumber(row.monthlyTarget) > 0 || row.unit === "PCS" || toNumber(row.branchSales) > 0) {
+                entry.sales += toNumber(row.branchSales ?? row.sales);
             }
             entry.count += 1;
 
@@ -19858,11 +19908,11 @@ window.DashboardTargets = (() => {
                     <td><bdi dir="ltr">${esc(row.salesmanCode)}</bdi></td>
                     <td class="strong">${esc(row.salesmanName)}</td>
                     <td>${esc(row.branch)}</td>
-                    <td class="n">${hasTarget ? money(row.monthlyTarget) : `<span class="muted">${esc(L.noTarget)}</span>`}</td>
-                    <td class="n">${money(row.sales)}</td>
+                    <td class="n">${row.unit === "PCS" ? esc(window.PcsTargets.pieces(row.pcsTarget)) : hasTarget ? money(row.monthlyTarget) : `<span class="muted">${esc(L.noTarget)}</span>`}</td>
+                    <td class="n">${money(row.sales)}${row.unit === "PCS" ? `<br><span class="muted">${esc(window.PcsTargets.pieces(row.pcsSold))}</span>` : ""}</td>
                     <td>${meter(row.achievement, rowTone)}</td>
-                    <td class="n">${hasTarget ? money(row.remaining) : "—"}</td>
-                    <td class="n">${hasTarget && row.excess > 0 ? money(row.excess) : "—"}</td>
+                    <td class="n">${row.unit === "PCS" ? esc(window.PcsTargets.pieces(row.remaining)) : hasTarget ? money(row.remaining) : "—"}</td>
+                    <td class="n">${row.unit === "PCS" ? (row.excess > 0 ? esc(window.PcsTargets.pieces(row.excess)) : "—") : hasTarget && row.excess > 0 ? money(row.excess) : "—"}</td>
                     <td><span class="badge ${rowTone}">${esc(!hasTarget ? L.noTarget : row.achieved ? L.achieved : L.below)}</span></td>
                 </tr>`;
         }).join("");
@@ -21328,10 +21378,16 @@ window.DashboardProfiles = (() => {
                 targetRow
             );
 
+        /* مناديب القطع: نسبة التحقيق بالقطع */
+        const pcsInfo =
+            window.PcsTargets?.evaluate?.(targetRow || { salesmanCode: code }) || null;
+
         const achievement =
-            target > 0
-                ? (sales / target) * 100
-                : 0;
+            pcsInfo
+                ? pcsInfo.achievement
+                : target > 0
+                    ? (sales / target) * 100
+                    : 0;
 
         const customersList =
             buildCustomers(
@@ -21394,6 +21450,7 @@ window.DashboardProfiles = (() => {
             due,
             overdue,
             achievement,
+            pcs: pcsInfo,
             invoiceCount:
                 uniqueInvoiceCount(invoices),
             newCustomerCount:
@@ -21857,9 +21914,11 @@ window.DashboardProfiles = (() => {
 
         utils.setText(
             "profileTargetValue",
-            utils.formatCurrency(
-                profile.target
-            )
+            profile.pcs
+                ? window.PcsTargets.pieces(profile.pcs.target)
+                : utils.formatCurrency(
+                    profile.target
+                )
         );
 
         utils.setText(
@@ -22803,7 +22862,8 @@ window.DashboardProfiles = (() => {
         const pct = value => (value == null || !isFinite(value) ? "—" : `${Number(value).toFixed(1)}%`);
         const hasCash = !document.body.classList.contains("cash-disabled") && (window.DashboardCashAll || []).length > 0;
 
-        const target = utils.toNumber(profile.target);
+        const pcsRing = profile.pcs || null;
+        const target = pcsRing ? utils.toNumber(pcsRing.target) : utils.toNumber(profile.target);
         const sales = utils.toNumber(profile.sales);
         const achievement = target > 0 ? utils.toNumber(profile.achievement) : null;
         const remaining = target > 0 ? Math.max(target - target * (achievement || 0) / 100, 0) : 0;
@@ -22887,12 +22947,12 @@ window.DashboardProfiles = (() => {
                         </svg>
                         <div class="ps-hero-text">
                             <span>${esc(T("تحقيق الهدف", "Target achievement"))}</span>
-                            <strong>${n0(sales)}</strong>
-                            <span>${target > 0 ? esc(T(`من هدف ${n0(target)} ر.س`, `of ${n0(target)} SAR target`)) : esc(T("بدون هدف", "No target"))}</span>
+                            <strong>${pcsRing ? esc(window.PcsTargets.pieces(pcsRing.sold)) : n0(sales)}</strong>
+                            <span>${pcsRing ? esc(T(`من هدف ${n0(target)} قطعة`, `of ${n0(target)} pcs target`)) : target > 0 ? esc(T(`من هدف ${n0(target)} ر.س`, `of ${n0(target)} SAR target`)) : esc(T("بدون هدف", "No target"))}</span>
                         </div>
                     </div>
                     <div class="ps-hero-bar">
-                        <div><span>${esc(T("المتبقي للهدف", "Remaining to target"))}</span><strong>${target > 0 ? n0(remaining) : "—"}</strong></div>
+                        <div><span>${esc(T("المتبقي للهدف", "Remaining to target"))}</span><strong>${target > 0 ? (pcsRing ? esc(window.PcsTargets.pieces(remaining)) : n0(remaining)) : "—"}</strong></div>
                         <div class="ps-track"><i style="width:${ringValue}%;background:${ringColor}"></i></div>
                         ${profile.forecast && utils.toNumber(profile.forecast.forecast) > 0 ? `<small>${esc(T(`توقع نهاية ${profile.forecast.monthLabel}`, `${profile.forecast.monthLabel} forecast`))}: <strong>${n0(profile.forecast.forecast)}</strong> (${esc(pct(profile.forecast.forecastPct))})</small>` : ""}
                         <small>${esc(T("الفترة", "Period"))}: ${esc(periodText)}</small>
@@ -29565,9 +29625,18 @@ window.DashboardReports = (() => {
 
                     const monthSales = monthlySales[index] || 0;
 
-                    const achievement = target > 0
-                        ? (monthSales / target) * 100
-                        : 0;
+                    const pad = value => String(value).padStart(2, "0");
+                    const pcs = window.PcsTargets?.evaluate?.(
+                        targetRow,
+                        `${year}-${pad(month)}-01`,
+                        `${year}-${pad(month)}-${pad(new Date(year, month, 0).getDate())}`
+                    );
+
+                    const achievement = pcs
+                        ? pcs.achievement
+                        : target > 0
+                            ? (monthSales / target) * 100
+                            : 0;
 
                     rows.push({
                         "Month": formatMonthLabel(year, month),
@@ -29577,7 +29646,9 @@ window.DashboardReports = (() => {
                         "Monthly Target": target,
                         "Net Sales": monthSales,
                         "Achievement %": achievement,
-                        "Remaining": Math.max(0, target - monthSales)
+                        "Remaining": Math.max(0, target - monthSales),
+                        "PCS Target": pcs ? pcs.target : "",
+                        "PCS Sold": pcs ? pcs.sold : ""
                     });
                 });
             });
@@ -29611,9 +29682,17 @@ window.DashboardReports = (() => {
                 const code = salesmanCode(row);
                 const target = monthlyTarget(row);
                 const totalSales = salesMap.get(code) || 0;
-                const achievement = target > 0
-                    ? (totalSales / target) * 100
-                    : 0;
+                const pcs = window.PcsTargets?.evaluate?.(
+                    row,
+                    currentData.filters?.dateFrom || null,
+                    currentData.filters?.dateTo || null
+                );
+
+                const achievement = pcs
+                    ? pcs.achievement
+                    : target > 0
+                        ? (totalSales / target) * 100
+                        : 0;
 
                 return {
                     "Salesman Code": code,
@@ -29622,7 +29701,9 @@ window.DashboardReports = (() => {
                     "Monthly Target": target,
                     "Net Sales": totalSales,
                     "Achievement %": achievement,
-                    "Remaining": Math.max(0, target - totalSales)
+                    "Remaining": Math.max(0, target - totalSales),
+                    "PCS Target": pcs ? pcs.target : "",
+                    "PCS Sold": pcs ? pcs.sold : ""
                 };
             }),
             currencyColumns: ["Monthly Target", "Net Sales", "Remaining"],
@@ -32752,7 +32833,7 @@ window.DashboardPresentation = (() => {
             invoiceSalesman.sales += amount;
 
             /* مبيعات الأكواد اللي لها هدف فقط تدخل في نسبة التحقيق */
-            if (window.DashboardTargets?.hasTargetForCode?.(row.salesmanCode) ?? true) {
+            if (window.PcsTargets?.isBranchCountedRow?.(row) || (window.DashboardTargets?.hasTargetForCode?.(row.salesmanCode) ?? true)) {
                 invoiceSalesman.targetSales += amount;
                 branchOf(row.branch).targetSales += amount;
                 company.targetSales += amount;
@@ -34649,7 +34730,7 @@ window.DashboardBranchReport = (() => {
             salesman.sales += amount;
 
             /* مبيعات الأكواد اللي لها هدف فقط تدخل في نسبة التحقيق */
-            if (window.DashboardTargets?.hasTargetForCode?.(row.salesmanCode) ?? true) {
+            if (window.PcsTargets?.isBranchCountedRow?.(row) || (window.DashboardTargets?.hasTargetForCode?.(row.salesmanCode) ?? true)) {
                 salesman.targetSales += amount;
                 branch.targetSales += amount;
                 company.targetSales += amount;
@@ -36583,7 +36664,7 @@ window.DashboardForecast = (() => {
 
         targets.forEach(row => {
             const target = monthTarget(row, monthIndex + 1);
-            if (target > 0) splitCodes(row.salesmanCode).concat(clean(row.salesmanCode)).forEach(code => targetCodes.add(code));
+            if (target > 0 || window.PcsTargets?.isPcs?.(row.salesmanCode)) splitCodes(row.salesmanCode).concat(clean(row.salesmanCode)).forEach(code => targetCodes.add(code));
 
             perSalesman.set(clean(row.salesmanCode), {
                 code: clean(row.salesmanCode),
@@ -36615,7 +36696,7 @@ window.DashboardForecast = (() => {
             const code = clean(row.salesmanCode);
             mtdAll += amount;
 
-            const hasTarget = splitCodes(code).some(item => targetCodes.has(item)) || targetCodes.has(code);
+            const hasTarget = window.PcsTargets?.isBranchCountedRow?.(row) || window.PcsTargets?.isBranchCounted?.(code) || splitCodes(code).some(item => targetCodes.has(item)) || targetCodes.has(code);
             if (hasTarget) mtd += amount;
 
             perSalesman.forEach(entry => {
@@ -37042,7 +37123,7 @@ window.DashboardMonthlyReport = (() => {
             });
         });
 
-        const isTargeted = code => splitCodes(code).concat(clean(code)).some(item => targetedCodes.has(item));
+        const isTargeted = code => window.PcsTargets?.isPcs?.(code) || window.PcsTargets?.isBranchCounted?.(code) || splitCodes(code).concat(clean(code)).some(item => targetedCodes.has(item));
 
         const salesmanOf = code => {
             const cleanCode = clean(code);
@@ -37056,7 +37137,7 @@ window.DashboardMonthlyReport = (() => {
             if (date < start || date > end) return;
 
             const amount = num(row.salesWithoutTax);
-            const targeted = isTargeted(row.salesmanCode);
+            const targeted = window.PcsTargets?.isBranchCountedRow?.(row) || isTargeted(row.salesmanCode);
 
             const otherKey = clean(row.salesmanCode) || "—";
             const otherName = salesmanOf(row.salesmanCode)?.name || clean(row.salesmanName) || otherKey;
@@ -39893,6 +39974,194 @@ window.__printFrame = function (win) {
         setTimeout(restore, 1500);
     }
 };
+
+/* =========================================================
+   مناديب القطع (PCS): هدفهم عدد قطع مش فلوس
+   - نسبة التحقيق = القطع المباعة ÷ هدف القطع للفترة
+   - هدف الشهر = هدف الربع ÷ 3 (نفس طريقة أهداف الريال: شهور كاملة)
+   - القطع = إطارات WANLI و DC و FALKEN و CHAO
+   - فلوسهم بتدخل في تحقيق الفرع (بس هدفهم بالريال = 0)
+   البيانات من window.OfflineCompanyPlan (كل الفروع)، أو من شيت Target
+   (عمود Target Basis = Qty) + الفواتير في داشبورد الإطارات
+========================================================= */
+window.PcsTargets = (() => {
+    function brandOf(description) {
+        const d = String(description || "").toUpperCase();
+        if (/\bWAN(LI|L)?-|\bWA-|WANLI/.test(d)) return 0;
+        if (/\bDC-|DOUBLE ?COIN|D\/COIN|\bDC\b/.test(d)) return 1;
+        if (/\bFAL-|FALKEN/.test(d)) return 2;
+        if (/\bCHAO-|CHAOYANG/.test(d)) return 3;
+        return -1;
+    }
+
+    let stateCache = { target: null, invoices: null, plan: null };
+
+    // داشبورد الإطارات: نبني نفس الشكل من بيانات الداشبورد
+    function planFromState() {
+        const raw = window.DashboardApp?.getState?.()?.rawData;
+        if (!raw) return null;
+        const target = Array.isArray(raw.target) ? raw.target : [];
+        const invoices = Array.isArray(raw.invoices) ? raw.invoices : [];
+        if (stateCache.target === target && stateCache.invoices === invoices) return stateCache.plan;
+        const salesmen = target
+            .filter(r => /qty|pcs|quantity/i.test(String(r.targetBasis || "")))
+            .map(r => ({
+                code: String(r.salesmanCode || ""),
+                codes: Array.isArray(r.salesmanCodes) ? r.salesmanCodes.map(String) : [],
+                type: "pcs",
+                q: [r.pcsTargetQ1, r.pcsTargetQ2, r.pcsTargetQ3, r.pcsTargetQ4].map(v => Number(v) || 0),
+                mix: null
+            }));
+        const codes = new Set(salesmen.map(s => s.code.toUpperCase().replace(/\s+/g, "")));
+        let maxDate = 0;
+        const lines = [];
+        invoices.forEach(inv => {
+            const text = String(inv.invoiceDate || "").slice(0, 10);
+            const m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!m) return;
+            const date = Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]);
+            if (date > maxDate) maxDate = date;
+            const code = String(inv.salesmanCode || "");
+            if (!codes.has(code.toUpperCase().replace(/\s+/g, ""))) return;
+            lines.push([date, code, brandOf(inv.productDescription), Number(inv.invoiceQuantity) || 0, Number(inv.salesWithoutTax) || 0, 0]);
+        });
+        const plan = salesmen.length
+            ? { year: Math.floor(maxDate / 10000) || new Date().getFullYear(), dataAsOf: maxDate, salesmen, lines, branchCounted: [] }
+            : null;
+        stateCache = { target, invoices, plan };
+        return plan;
+    }
+
+    const plan = () => window.OfflineCompanyPlan || planFromState();
+    const norm = v => String(v == null ? "" : v).toUpperCase().replace(/\s+/g, "");
+    let cache = { plan: null, byCode: null };
+
+    function index() {
+        const p = plan();
+        if (!p) return null;
+        if (cache.plan === p) return cache.byCode;
+        const byCode = new Map();
+        p.salesmen.filter(s => s.type === "pcs").forEach(s => {
+            byCode.set(norm(s.code), s);
+            (s.codes || []).forEach(c => { if (!byCode.has(norm(c))) byCode.set(norm(c), s); });
+        });
+        cache = { plan: p, byCode };
+        return byCode;
+    }
+
+    function entryFor(rowOrCode) {
+        const map = index();
+        if (!map || rowOrCode == null) return null;
+        const code = typeof rowOrCode === "object"
+            ? (rowOrCode.salesmanCode ?? rowOrCode["Salesman Code"] ?? rowOrCode.code ?? "")
+            : rowOrCode;
+        const key = norm(code);
+        if (!key) return null;
+        if (map.has(key)) return map.get(key);
+        // "305 + 326" → أي كود منهم
+        const parts = String(code).toUpperCase().split(/\s*(?:\+|&|,)\s*/).map(norm).filter(Boolean);
+        for (const part of parts) if (map.has(part)) return map.get(part);
+        return null;
+    }
+
+    const isPcs = rowOrCode => !!entryFor(rowOrCode);
+
+    // أكواد مالهاش هدف بس مبيعاتها بتدخل في تحقيق الفرع (زي 119-MAJ أسعار المجدوعي الخاصة)
+    function isBranchCounted(code) {
+        const p = plan();
+        if (!p || !p.branchCounted || !p.branchCounted.length || code == null) return false;
+        const key = norm(code);
+        return p.branchCounted.some(c => norm(c) === key);
+    }
+
+    function toInt(value) {
+        if (value == null || value === "") return 0;
+        if (value instanceof Date) return value.getFullYear() * 10000 + (value.getMonth() + 1) * 100 + value.getDate();
+        const text = String(value).slice(0, 10);
+        const m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]);
+        const d = new Date(value);
+        return isNaN(d) ? 0 : toInt(d);
+    }
+
+    // الفترة الحالية في صفحة الأهداف (أو شهر التاريخ المرجعي)
+    function currentPeriod() {
+        const targets = window.DashboardTargets;
+        const period = targets?.getPeriod?.();
+        if (period && period.from && period.to) return { from: period.from, to: period.to };
+        const ref = targets?.getReferenceDate?.() || new Date();
+        const d = ref instanceof Date ? ref : new Date(ref);
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const last = new Date(y, m + 1, 0).getDate();
+        const pad = n => String(n).padStart(2, "0");
+        return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 1)}-${pad(last)}` };
+    }
+
+    function evaluate(rowOrCode, from, to) {
+        const entry = entryFor(rowOrCode);
+        const p = plan();
+        if (!entry || !p) return null;
+        if (from == null && to == null) ({ from, to } = currentPeriod());
+        let a = toInt(from) || toInt(to);
+        let b = toInt(to) || a;
+        if (a > b) [a, b] = [b, a];
+
+        // الهدف: شهور الفترة كاملة
+        let target = 0;
+        let y = Math.floor(a / 10000);
+        let m = Math.floor(a / 100) % 100;
+        const endY = Math.floor(b / 10000);
+        const endM = Math.floor(b / 100) % 100;
+        let guard = 0;
+        while ((y < endY || (y === endY && m <= endM)) && guard < 120) {
+            if (y === p.year) target += (entry.q[Math.floor((m - 1) / 3)] || 0) / 3;
+            m += 1;
+            if (m > 12) { m = 1; y += 1; }
+            guard += 1;
+        }
+
+        let sold = 0;
+        let sales = 0;
+        const brands = [0, 0, 0, 0];
+        p.lines.forEach(([date, code, brand, qty, value]) => {
+            if (code !== entry.code || date < a || date > b) return;
+            sales += value;
+            if (brand >= 0) { sold += qty; brands[brand] += qty; }
+        });
+        target = Math.round(target);
+        const achievement = target > 0 ? (sold / target) * 100 : 0;
+        return { code: entry.code, target, sold, sales, brands, mix: entry.mix, achievement, remaining: Math.max(target - sold, 0), excess: Math.max(sold - target, 0) };
+    }
+
+    // صف أداء من صفحة الأهداف → نسبة التحقيق بالقطع
+    function apply(row, from, to) {
+        const info = evaluate(row, from, to);
+        if (!info) return row;
+        return {
+            ...row,
+            unit: "PCS",
+            pcsTarget: info.target,
+            pcsSold: info.sold,
+            achievement: info.achievement,
+            remaining: info.remaining,
+            excess: info.excess,
+            achieved: info.target > 0 && info.achievement >= 100
+        };
+    }
+
+    const lang = () => (window.DashboardUtils?.getLanguage?.() === "en" ? "en" : "ar");
+    const pieces = value => {
+        const n = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0));
+        return lang() === "en" ? `${n} pcs` : `${n} قطعة`;
+    };
+
+    // صف فاتورة/تحصيل: الكود الأصلي قبل الدمج (originalSalesmanCode)
+    const isBranchCountedRow = row => !!row && isBranchCounted(row.originalSalesmanCode ?? row["Original Salesman Code"] ?? "");
+
+    return Object.freeze({ isPcs, isBranchCounted, isBranchCountedRow, entryFor, evaluate, apply, currentPeriod, pieces });
+})();
+
 
 window.DashboardApp = (() => {
     const config = window.DashboardConfig;
