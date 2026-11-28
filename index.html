@@ -18564,9 +18564,17 @@ window.DashboardTargets = (() => {
             return false;
         }
 
-        const rowsSource = targetRows.length
-            ? targetRows
-            : normalizeTargetRows(window.DashboardApp?.getState?.()?.rawData?.target || []);
+        /* كل صفوف الهدف (مش المفلترة بالفرع، ولا بتاعة الفلتر اللي قبله):
+           لوحة التحكم بتتحسب قبل ما صفحة الأهداف تستلم البيانات الجديدة */
+        const rawTargets = window.DashboardApp?.getState?.()?.rawData?.target;
+        let rowsSource = targetRows;
+        if (Array.isArray(rawTargets) && rawTargets.length) {
+            if (hasTargetForCode.cacheKey !== rawTargets) {
+                hasTargetForCode.cacheKey = rawTargets;
+                hasTargetForCode.cacheRows = normalizeTargetRows(rawTargets);
+            }
+            rowsSource = hasTargetForCode.cacheRows;
+        }
 
         return rowsSource.some(row =>
             getSalesmanCodes(row).some(item => wanted.includes(item)) &&
