@@ -18564,7 +18564,11 @@ window.DashboardTargets = (() => {
             return false;
         }
 
-        return targetRows.some(row =>
+        const rowsSource = targetRows.length
+            ? targetRows
+            : normalizeTargetRows(window.DashboardApp?.getState?.()?.rawData?.target || []);
+
+        return rowsSource.some(row =>
             getSalesmanCodes(row).some(item => wanted.includes(item)) &&
             getPeriodTarget(row, getQuarter(referenceDate)) > 0
         );
